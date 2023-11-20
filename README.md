@@ -11,13 +11,13 @@ Refuels the turtle using coal, charcoal, or blocks of coal.
 ### Quarry
 Mines a given area and periodically deposits valuable ores. Includes a blacklist for junk ores.
 
-> Usage: quarry <depth> <distance> <width>
-`quarry 10 10 10`
+> Usage: `quarry &lt;depth&gt; &lt;distance&gt; &lt;width&gt;`
+
 
 ### Passage
 Creates a secure passage through dangerous areas using cobblestone and glass
 
-> Usage: passage <distance>
+> Usage: passage &lt;distance>
 `passage 10`
 
 
