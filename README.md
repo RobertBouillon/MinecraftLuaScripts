@@ -11,21 +11,18 @@ Refuels the turtle using coal, charcoal, or blocks of coal.
 ### Quarry
 Mines a given area and periodically deposits valuable ores. Includes a blacklist for junk ores.
 
-> Usage: `quarry &lt;depth&gt; &lt;distance&gt; &lt;width&gt;`
-
+> Usage: `quarry <depth> <distance> <width>`
 
 ### Passage
 Creates a secure passage through dangerous areas using cobblestone and glass
 
-> Usage: passage &lt;distance>
-`passage 10`
+> Usage: `passage <distance>`
 
 
 ### Inscriber
 Automation for the AE2 inscriber. Place a chest to the left of an advanced computer and a powered inscriber to the right.
 
-> Usage: inscriber
-`inscriber`
+> Usage: `inscriber`
 
 ### Farmer
 Will repeatedly plant, fertilize, and harvest a crop on a single block in front of the turtle.
@@ -33,8 +30,7 @@ Will repeatedly plant, fertilize, and harvest a crop on a single block in front 
 Place the seed in slot #1 and the fertilizer in slot #2. A fully-grown plant is required in front of the turtle to start the process.
 The turtle will use items in the entire inventory.
 
-> Usage: farm
-`farm`
+> Usage: `farm`
 
 
 ## Libraries
