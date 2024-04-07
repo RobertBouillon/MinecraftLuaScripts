@@ -75,23 +75,3 @@ function Fluid.new(id : string , name: string|nil) : Item
   local self: Item = setmetatable(Thing.new("Fluid", id, name) as Item, { __index = Item })
   return self
 end
-
--- local record MCItem
---   damage: number | nil
---   name: string | nil
--- end
-
--- global function ThingsEqual(a: MCItem | string | nil,b: MCItem | string | nil) : boolean
--- 	if a==nil or b==nil then return false end
-
---   local mca, mcb: MCItem, MCItem;
-
--- 	if type(a) == "string" then mca = {name=a} as MCItem end
--- 	if type(b) == "string" then mcb = {name=b} as MCItem end
-
--- 	if mca.damage == nil then mca["damage"] = 0 end
--- 	if mcb.damage == nil then mcb["damage"] = 0 end
- 
--- 	return mca.damage == mcb.damage and mca.name == mcb.name
--- end
-

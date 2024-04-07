@@ -1,4 +1,4 @@
-require "v2/Factory/Machine"
+require "v2/Factory"
 
 local Things = {
   ManaPowder    = { __type = "Item", id = "botania:mana_powder",                  name = "Mana Powder" } as Thing,
@@ -43,22 +43,60 @@ local Things = {
 }
 
 local Machines = {
-  LiquidBlazeBurner     = MachineType.new("createaddition:liquid_blaze_burner_2",       "Liquid Blaze Burner"),
+  FluidExtractor        = MachineType.new("industrialforegoing:fluid_extractor",        "Fluid Extractor"),
+  BlockPlacer           = MachineType.new("industrialforegoing:block_placer",           "Block Placer"),
+  LiquidBlazeBurner     = MachineType.new("createaddition:liquid_blaze_burner",         "Liquid Blaze Burner"),
+  Thermo                = MachineType.new("pneumaticcraft:thermopneumatic_processing_plant",  "Spores Recreator"),
+  Mixer                 = MachineType.new("pneumaticraft:fluid_mixerc",                 "Latex Pro,cessing Unit"),
+  Crafter               = MachineType.new("thermal:machine_crafter",      "Crafter"),
+  Crafter3              = MachineType.new("rftoolsutility:crafter3",                    "Crafter (3)"),
+
   SuperCooler           = MachineType.new("rftoolsutility:ftbsba:super_cooler",         "Super Cooler"),
   SporesRecreator       = MachineType.new("industrialforegoing:spores_recreator",       "Spores Recreator"),
   LatexProcessingUnit   = MachineType.new("industrialforegoing:latex_processing_unit",  "Latex Processing Unit"),
   MechanicalSqueezer    = MachineType.new("integrateddynamics:mechanical_squeezer",     "Mechanical Squeezer"),
-  Thermo                = MachineType.new("pneumaticcraft:thermopneumatic_processing_plant",  "Spores Recreator"),
-  Mixer                 = MachineType.new("pneumaticraft:fluid_mixerc",                 "Latex Pro,cessing Unit"),
-  Crafter3              = MachineType.new("rftoolsutility:crafter3",                    "Crafter (3)"),
   PhytogenicInsolator   = MachineType.new("thermal:machine_insolator",    "Phytogenic Insolator"),
   Pulverizer            = MachineType.new("thermal:machine_pulverizer",   "Pulverizer"),
-  Crafter               = MachineType.new("thermal:machine_crafter",      "Crafter"),
   FluidEncapsulator     = MachineType.new("thermal:machine_bottler",      "Fluid Encapsulator"),
   RedstoneFurnace       = MachineType.new("thermal:machine_furnace",      "Redstone Furnace"),
   MagmaCrucible         = MachineType.new("thermal:machine_crucible",     "Magma Crucible"),
   Pyrolyzer             = MachineType.new("thermal:machine_pyrolyzer",    "Pyrolyzer"),
 }
+
+
+global record LatexMachine
+  new: function(placerID : string, extractorID : string) : LatexMachine
+
+  placer : Machine
+  extractor : Machine
+
+  --Inherited
+  type: MachineType
+  work: function(self : LatexMachine, storage : Storage)
+  clear: function(self : LatexMachine, storage : Storage)
+  --work: MachineType.machineWorker
+  --clear: MachineType.machineClearer
+end
+setmetatable(LatexMachine, {__index = Machine})
+
+function LatexMachine.new(placerID : string, extractorID : string) : LatexMachine
+  local self: LatexMachine = setmetatable(Machine.new() as LatexMachine, { __index = LatexMachine })
+  self.placer     = PeripheralMachine.new(placerID, Machines.BlockPlacer) as Machine
+  self.extractor  = PeripheralMachine.new(extractorID, Machines.FluidExtractor) as Machine
+  return self
+end
+
+function LatexMachine:work(storage : Storage)
+  storage.item:pushMax(self.placer.storage.item, Things.OakLog as Item, 1)
+  storage.fluid:pullAll(self.extractor.storage.fluid, Things.Latex as Fluid)
+end
+
+function LatexMachine:clear(storage : Storage)
+  storage.item:pullAll(self.placer.storage.item, Things.OakLog as Item)
+  storage.fluid:pullAll(self.extractor.storage.fluid, Things.Latex as Fluid)
+end
+
+
 
 local Recipes : { Recipe } = {
   Recipe.new(Things.Mushroom,     Machines.SporesRecreator.id,      Things.Mushroom, Things.Water),
@@ -74,7 +112,6 @@ local Recipes : { Recipe } = {
   Recipe.new(Things.VegetableOil, Machines.Thermo.id,               Things.Potato),
   Recipe.new(Things.Ethanol,      Machines.Thermo.id,               Things.Potato, Things.Yeast),
   Recipe.new(Things.Biodiesel,    Machines.Mixer.id,                Things.VegetableOil, Things.Ethanol), -- ItemsOut = {1}
-  Recipe.new(Things.Latex,        Machines.SporesRecreator.id,      Things.OakLog, Things.Water),         -- No machine ID?
   Recipe.new(Things.Ethylene,     Machines.Thermo.id,               Things.SulfurDust, Things.Ethanol),
   Recipe.new(Things.Polyethylene, Machines.Mixer.id,                Things.Ethylene, Things.Latex),
   Recipe.new(Things.MenrilLog,    Machines.PhytogenicInsolator.id,  Things.MenrilSapling, Things.Water),
@@ -88,12 +125,66 @@ local Recipes : { Recipe } = {
   Recipe.new(Things.MenrilResin,  Machines.MagmaCrucible.id,        Things.MenrilCrystal),
   Recipe.new(Things.MenrilCrystal,Machines.MechanicalSqueezer.id,   Things.MenrilLog),
   Recipe.new(Things.LiquidForce,  Machines.Pyrolyzer.id,            Things.ForcePlanks),
+
+  Recipe.new(Things.Latex,        LatexMachine.new,                 Things.OakLog, Things.Water),         -- No machine ID?
 }
 
-return {
-  recipes = Recipes,
-  craftable = {
+-- return {
+--   recipes = Recipes,
+--   machines = {
+--     Machines.SuperCooler           ,
+--     Machines.SporesRecreator       ,
+--     Machines.LatexProcessingUnit   ,
+--     Machines.MechanicalSqueezer    ,
+--     Machines.PhytogenicInsolator   ,
+--     Machines.Pulverizer            ,
+--     Machines.FluidEncapsulator     ,
+--     Machines.RedstoneFurnace       ,
+--     Machines.MagmaCrucible         ,
+--     Machines.Pyrolyzer             ,
+--   },
+--   craftable = {
+--     Things.Mushroom,
+--     Things.Potato,
+--     Things.OakLog,
+--     Things.RawSilver,
+--     Things.Quicksilver,
+--     Things.Acetaldehyde,
+--     Things.PhelonicResin,
+--     Things.Duroplast,
+--     Things.TinyRubber,
+--     Things.Yeast,
+--     Things.VegetableOil,
+--     Things.Ethanol,
+--     Things.Biodiesel,
+--     Things.Ethylene,
+--     Things.Polyethylene,
+--     Things.MenrilLog,
+--     Things.ForceLog,
+--     Things.ForcePlanks,
+--     Things.DryRubber,
+--     Things.Mushroom,
+--     Things.Plastic,
+--     Things.LDPE,
+--     Things.MoltenSilver,
+--     Things.MenrilResin,
+--     Things.MenrilCrystal,
+--     Things.LiquidForce,
+--     Things.Latex,
+--   }
+-- }
 
-  }
-}
+local machines = {MachineType}
+for _,machine in pairs(Machines) do
+  table.insert(machines, machine)
+end
 
+
+local storage = Storage.new("functionalstorage:storage_controller_4")
+local factory = Factory.new(storage)
+
+factory:addRecipes(Recipes)
+factory:detectMachines(machines)
+factory:make(20, Things.Potato)
+
+factory:run()

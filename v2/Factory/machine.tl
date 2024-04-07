@@ -17,7 +17,7 @@ global record MachineType
 end
 
 global record Machine
-  new: function(machineType: MachineType) : Machine
+  new: function(machineType: MachineType | nil) : Machine
 
   type: MachineType
   storage : Storage
@@ -25,11 +25,16 @@ global record Machine
   clear: MachineType.machineWorker
 end
 
-function Machine.new(machineType: MachineType) : Machine
+function Machine.new(machineType: MachineType | nil) : Machine
   local self: Machine = setmetatable({}, { __index = Machine })
   self.type = machineType
-  self.work = machineType.worker
-  self.clear = machineType.clearer
+
+  if machineType is MachineType then
+    self.work = machineType.worker
+  end   --Need two type guards due to parsing bug :(
+  if machineType is MachineType then
+    self.clear = machineType.clearer
+  end
   return self
 end
 
@@ -68,20 +73,25 @@ end
 global record PeripheralMachine
   new: function(peripheralID : string, machineType: MachineType) : PeripheralMachine
 
-  peripheral: peripheral
-
   --Inherited
   type: MachineType
+  storage : Storage
   work: MachineType.machineWorker
   clear: MachineType.machineClearer
 end
 setmetatable(PeripheralMachine, {__index = Machine})
 
 function PeripheralMachine.new(peripheralID : string, machineType: MachineType) : PeripheralMachine
-  local self: PeripheralMachine = setmetatable(Machine.new(machineType) as PeripheralMachine, { __index = Item })
-  self.peripheral = peripheral.wrap(peripheralID)
+  local self: PeripheralMachine = setmetatable(Machine.new(machineType) as PeripheralMachine, { __index = PeripheralMachine })
+  self.storage = Storage.new(peripheralID)
+
+  if MachineType.parse(peripheralID) ~= machineType.id then
+    error("'" .. MachineType.parse(peripheralID) .. "' is not a '" .. machineType.name .. "'")
+  end
+
   return self
 end
+
 
 
 --Push things to a machine from storage

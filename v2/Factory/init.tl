@@ -3,9 +3,7 @@ require "Common"
 require "v2/Factory/Recipe"
 require "v2/Factory/Machine"
 
-local record Factory
-  items:  { string : Item }
-  machines: { Machine }
+global record Factory
   recipes: { Thing : Recipe }
   quotas: { Thing : integer}
   storage: Storage
@@ -18,17 +16,9 @@ local record Factory
 end
 
 function Factory.new(
-    items: { string : Item},
-    machines: { Machine },
-    recipes: { Thing : Recipe },
-    quotas: { Thing : integer },
     storage: Storage
   ): Factory
   local self: Factory = setmetatable({}, { __index = Factory })
-  self.items = items
-  self.machines = machines
-  self.recipes = recipes
-  self.quotas = quotas
   self.storage = storage
   self.runlog = {}
   return self
@@ -88,10 +78,6 @@ function Factory:canMake(recipe: Recipe) : boolean, string
   return true
 end
 
-function Factory:addMachine(machine: Machine)
-  table.insert(self.machines, machine)
-end
-
 function Factory:addRecipes(recipes: {Recipe})
   for _,recipe in ipairs(recipes) do
     self.recipes[recipe.thing] = recipe
@@ -133,10 +119,21 @@ function Factory:startMaking(thing : Thing) : boolean
       self.runlog[thing] = message
       return false
     else
-      local assignedMachine = self:assign(thing, recipe.machineType)
-      if assignedMachine == nil then
-        self.runlog[thing] = "No " .. recipe.machineType .. " available"
-        return false
+      local machineType = recipe.machineType
+      if machineType is string then
+        local assignedMachine = self:assign(thing, machineType)
+        if assignedMachine == nil then
+          self.runlog[thing] = "No " .. machineType .. " available"
+          return false
+        end
+      elseif machineType is function(...:string) then
+        local dedicatedMachine = self.dedicatedMachines[thing]
+        if dedicatedMachine == nil then
+          self.runlog[thing] = "'" .. tostring(thing) .. "'s' requires a dedicated machine"
+          return false
+        else
+          self.assignedMachines[thing] = dedicatedMachine
+        end
       end
     end
   end
@@ -147,7 +144,11 @@ function Factory:stopMaking(thing : Thing)
   local machine = self.assignedMachines[thing]
   self.assignedMachines[thing] = nil
   machine:clear(self.storage)
-  self:addToPool(machine)
+
+  --Not a dedicated machine. Add it back to the pool
+  if self.dedicatedMachines[thing] == nil then
+    self:addToPool(machine)
+  end
 end
 
 function Factory:isMaking(thing : Thing) : boolean
@@ -174,6 +175,16 @@ end
 function Factory:runMachines()
   for thing,machine in pairs(self.assignedMachines) do
     machine:work(self.storage, self.recipes[thing])
+  end
+end
+
+function Factory:addDedicatedMachine(thing : Thing, ... : string)
+  local recipe = self.recipes[thing]
+  local machineType = recipe.machineType
+  if machineType is string then 
+    error("'" .. tostring(thing) .. "' is not configured for a dedicated machine") 
+  elseif machineType is function(...:string) : Machine then
+    self.dedicatedMachines[thing] = machineType(...)
   end
 end
 
