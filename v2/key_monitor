@@ -1,0 +1,25 @@
+local key_monitor = {
+  __TYPE = "ItemStorage",
+}
+
+local keysPressed = {}
+
+local function CheckInput()
+  while true do
+    local _, key = os.pullEvent("key")
+    table.insert(keysPressed, key)
+  end
+end
+
+function key_monitor.Start()
+  key_monitor.Coroutine = coroutine.create(CheckInput)
+end
+
+function key_monitor.isKeyPressed()
+  if #keysPressed == 0 then return false end
+  local ret = keysPressed[1]
+  table.remove(keysPressed, 1)
+  return true, ret
+end
+
+return key_monitor
