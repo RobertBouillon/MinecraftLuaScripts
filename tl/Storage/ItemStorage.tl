@@ -1,9 +1,17 @@
-require "v2/Factory/Item"
-require "v2/Storage/Common"
-require "ccapi"
+require "tl/Factory/Item"
+require "tl/Storage/Common"
+require "tl/ccapi"
 
 global record ItemStorage
+   record SlotContents
+    name: string
+    count: integer
+  
+    damage: integer | nil
+  end
+
   getPeripheralName : function(storage: ItemStorage | string) : string
+  isItemStorage: function (name: string) : boolean
 
   peripheralName: string
   peripheral: peripheral.inventory
@@ -37,7 +45,7 @@ global record ItemStorage
     self: ItemStorage,
     to : ItemStorage | string, 
     item: Item | string, 
-    max: integer,
+    max: integer | nil,
     toSlot: integer | nil,
     min: integer | nil) : integer
 
@@ -57,12 +65,20 @@ global record ItemStorage
     toSlot: integer | nil
   ) : integer
 
+  pullSlots: function (
+    self: ItemStorage,
+    from : ItemStorage | string, 
+    item: Item | string | nil, 
+    startingSlot: integer,
+    toSlot: integer | nil) : integer
+
 end
 
 
 function ItemStorage.new(peripheralName: string): ItemStorage
 local self: ItemStorage = setmetatable({}, { __index = ItemStorage })
   self.peripheralName = peripheralName
+  if not ItemStorage.isItemStorage(peripheralName) then error ("'" .. peripheralName .. "' does not implement the inventory API") end
   self.peripheral = peripheral.wrap(peripheralName) as peripheral.inventory
 return self
 end
@@ -80,16 +96,32 @@ local record ItemStorageWrapper
   itemStorage: ItemStorage | nil
 end
 
+function ItemStorage:list(filter: Item | string | nil) : {integer : ItemStorage.SlotContents}
+  local list = self.peripheral.list() as { integer : ItemStorage.SlotContents } 
+  if filter is nil then return list end
+  local id : string
+  if filter is string then id = filter
+  elseif filter is Item then id = filter.id 
+  elseif filter is nil then return list end
+  local filtered : { integer : ItemStorage.SlotContents } = {}
+  for slot,contents in pairs(list) do
+    if contents.name == id then
+      filtered[slot] = contents
+    end
+  end
+  return filtered
+end
+
 function ItemStorage:size() : integer
   return self.peripheral.size()
 end
 
-function ItemStorage:getItem(slot: integer) : SlotContents
+function ItemStorage:getItem(slot: integer) : ItemStorage.SlotContents
   return self:list()[slot]
 end
 
-function ItemStorage:getItemDetail(slot: integer) : SlotContents
-  return self.peripheral.getItemDetail(slot) as SlotContents
+function ItemStorage:getItemDetail(slot: integer) : ItemStorage.SlotContents
+  return self.peripheral.getItemDetail(slot) as ItemStorage.SlotContents
 end
 
 function ItemStorage:counts() : { string : integer}
@@ -129,7 +161,7 @@ function ItemStorageWrapper.new(block : ItemStorage | string): ItemStorageWrappe
       self.itemStorage = ItemStorage.new(block) 
     end
   elseif block is ItemStorage then
-    self.peripheralName = ItemStorage.peripheralName
+    self.peripheralName = block.peripheralName
     self.itemStorage = block
   end
   return self
@@ -206,7 +238,7 @@ function ItemStorage:pushAll(
 
   local peripheralName = ItemStorage.getPeripheralName(to)
 
-  local toMove : { integer : SlotContents }
+  local toMove : { integer : ItemStorage.SlotContents }
 
   if item is nil then
     toMove = self:list()
@@ -224,10 +256,11 @@ function ItemStorage:pushAll(
   return total
 end
 
+--Pushes up to a max amount when a min amount is reached.
 function ItemStorage:pushMax(
   to : ItemStorage | string, 
   item: Item | string, 
-  max: integer,
+  max: integer | nil,
   toSlot: integer | nil,
   min: integer | nil) : integer
 
@@ -235,15 +268,21 @@ function ItemStorage:pushMax(
 
   local count : integer
   if toSlot is nil then
-    count = max - _to:getItemStorage():count(item)
+    count = _to:getItemStorage():count(item)
   elseif toSlot is integer then
-    count = max - _to:getItemStorage():count(toSlot)
+    count = _to:getItemStorage():count(toSlot)
   else
     error(type(toSlot))
   end
 
   if min is integer then
     if count > min then return 0 end
+  end
+
+  if max is integer then
+    count = max - count
+  else
+    count = nil
   end
 
   return self:pushAll(to, item, count, toSlot)
@@ -277,7 +316,7 @@ function ItemStorage:pullAll(
 
   local _from = ItemStorageWrapper.new(from)
 
-  local toMove : { integer : SlotContents }
+  local toMove : { integer : ItemStorage.SlotContents }
 
   if item is nil then
     toMove = _from:getItemStorage():list()
@@ -286,11 +325,42 @@ function ItemStorage:pullAll(
   end
 
   local total = 0
-  for slot in pairs(self:list(item)) do
+
+  for slot in pairs(toMove) do
     local moved = total + self.peripheral.pullItems(_from.peripheralName,slot,count,toSlot)
-    count = count - moved
-    if count == 0 then break end
+    if count is integer then
+      count = count - moved
+      if count <= 0 then break end
+    end
     total = total + moved
+  end
+  return total
+end
+
+
+function ItemStorage:pullSlots(
+  from : ItemStorage | string, 
+  item: Item | string | nil, 
+  startingSlot: integer,
+  toSlot: integer | nil) : integer
+
+  local _from = ItemStorageWrapper.new(from)
+
+  local toMove : { integer : ItemStorage.SlotContents }
+
+  if item is nil then
+    toMove = _from:getItemStorage():list()
+  elseif item is Item | string then
+    toMove = _from:getItemStorage():list(item)
+  end
+
+  local total = 0
+
+  for slot in pairs(toMove) do
+    if slot >= startingSlot then
+      local moved = total + self.peripheral.pullItems(_from.peripheralName,slot,nil,toSlot)
+      total = total + moved
+    end
   end
   return total
 end

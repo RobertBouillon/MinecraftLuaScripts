@@ -1,7 +1,7 @@
-require "Common"
+require "tl/Common"
 
-require "v2/Factory/Recipe"
-require "v2/Factory/Machine"
+require "tl/Factory/Recipe"
+require "tl/Factory/Machine"
 
 global record Factory
   recipes: { Thing : Recipe }
@@ -19,8 +19,14 @@ function Factory.new(
     storage: Storage
   ): Factory
   local self: Factory = setmetatable({}, { __index = Factory })
+  self.recipes = {}
+  self.quotas = {}
   self.storage = storage
   self.runlog = {}
+
+  self.machinePool = {}
+  self.dedicatedMachines = {}
+  self.assignedMachines = {}
   return self
 end
 
@@ -45,7 +51,7 @@ function Factory:assign(thing: Thing, machineType : string) : Machine
 end
 
 function Factory:detectMachines(machineTypes : {MachineType})
-  local index : { string : MachineType }
+  local index : { string : MachineType } = {}
   for _,t in ipairs(machineTypes) do
     index[t.id] = t
   end
@@ -61,18 +67,20 @@ end
 function Factory:clearMachines()
   for _,machines in pairs(self.machinePool) do
     for _,machine in ipairs(machines) do
+      print("Clearing " .. machine.type.name)
       machine:clear(self.storage)
     end
   end
   for _,machine in pairs(self.dedicatedMachines) do
+    print("Clearing " .. machine.type.name)
     machine:clear(self.storage)
   end
 end
 
 function Factory:canMake(recipe: Recipe) : boolean, string
-  for _,thing in ipairs(repack(recipe.inputs)) do
+  for _,thing in ipairs(recipe.inputs) do
     if not self.storage:contains(thing) then
-      return false, "Missing " .. tostring(thing)
+      return false, "Missing " .. thing.name
     end
   end
   return true
@@ -95,7 +103,7 @@ function Factory:renderUI()
 
   local lines = 0
   for item,message in pairs(self.runlog) do
-    print(string.format("%-20s", tostring(item)) .. message)
+    print(string.format("%-20s", item.name) .. message)
     lines = lines + 1
   end
   if lines == 0 then
@@ -123,13 +131,13 @@ function Factory:startMaking(thing : Thing) : boolean
       if machineType is string then
         local assignedMachine = self:assign(thing, machineType)
         if assignedMachine == nil then
-          self.runlog[thing] = "No " .. machineType .. " available"
+          self.runlog[thing] = "No " .. machineType .. " available"  --TODO: This should be a formatted name.
           return false
         end
       elseif machineType is function(...:string) then
         local dedicatedMachine = self.dedicatedMachines[thing]
         if dedicatedMachine == nil then
-          self.runlog[thing] = "'" .. tostring(thing) .. "'s' requires a dedicated machine"
+          self.runlog[thing] = "'" .. thing.name .. "'s' requires a dedicated machine"
           return false
         else
           self.assignedMachines[thing] = dedicatedMachine
@@ -144,6 +152,7 @@ function Factory:stopMaking(thing : Thing)
   local machine = self.assignedMachines[thing]
   self.assignedMachines[thing] = nil
   machine:clear(self.storage)
+  self.runlog[thing] = nil
 
   --Not a dedicated machine. Add it back to the pool
   if self.dedicatedMachines[thing] == nil then
@@ -161,7 +170,7 @@ function Factory:checkQuotas()
     self.runlog[thing] = count .. "/" .. amount
     
     if count < amount then
-      if self:isMaking(thing) then   
+      if not self:isMaking(thing) then   
         self:startMaking(thing)
       end
     else
@@ -182,16 +191,14 @@ function Factory:addDedicatedMachine(thing : Thing, ... : string)
   local recipe = self.recipes[thing]
   local machineType = recipe.machineType
   if machineType is string then 
-    error("'" .. tostring(thing) .. "' is not configured for a dedicated machine") 
+    error("'" .. thing.name .. "' is not configured for a dedicated machine") 
   elseif machineType is function(...:string) : Machine then
     self.dedicatedMachines[thing] = machineType(...)
   end
 end
 
 function Factory:run()
-
-  self:detectMachines()
-  self:clearMachines()
+  --self:clearMachines()
 
   while true do
     self:checkQuotas()

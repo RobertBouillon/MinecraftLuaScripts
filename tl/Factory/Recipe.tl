@@ -1,4 +1,4 @@
-require "v2/factory/Item"
+require "tl/factory/Item"
 
 global record Recipe
   new: function(thing: Thing, machineType: string | function(...:string), ...: Thing) : Recipe

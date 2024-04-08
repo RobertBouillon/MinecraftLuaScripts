@@ -1,16 +1,22 @@
-require "v2/Factory/Item"
-require "v2/Storage/Common"
-require "ccapi"
+require "tl/Factory/Item"
+require "tl/Storage/Common"
+require "tl/ccapi"
 
 --Comments left in to illustrate differences with ItemStorage API
 --Big difference between this and ItemStorage is no concept of slot numbers in push/pull
 --HOWEVER you can still get slot numbers from list() for some reason
 global record FluidStorage
+  record TankContents
+    name: string
+    amount: integer
+  end
+
   getPeripheralName : function(storage: FluidStorage | string) : string
+  isFluidStorage: function (name: string) : boolean
 
   peripheralName: string
   peripheral: peripheral.fluid_storage
-  list: function(self: FluidStorage, filter: Fluid | string | nil) : {integer : SlotContents}
+  list: function(self: FluidStorage, filter: Fluid | string | nil) : {TankContents}
   count: function (self: FluidStorage, Fluid: Fluid | string | nil) : integer
   find: function(self: FluidStorage, Fluid: Fluid | string) : boolean,integer | nil --Found,Count
   counts: function(self: FluidStorage) : { string : integer }
@@ -35,7 +41,7 @@ global record FluidStorage
     self: FluidStorage,
     to : FluidStorage | string, 
     fluid: Fluid | string, 
-    max: integer,
+    max: integer | nil,
     --toSlot: integer | nil,
     min: integer | nil) : integer
 
@@ -60,6 +66,7 @@ end
 function FluidStorage.new(peripheralName: string): FluidStorage
 local self: FluidStorage = setmetatable({}, { __index = FluidStorage })
   self.peripheralName = peripheralName
+  if not FluidStorage.isFluidStorage(peripheralName) then error ("'" .. peripheralName .. "' does not implement the fluid_storage API") end
   self.peripheral = peripheral.wrap(peripheralName) as peripheral.fluid_storage
 return self
 end
@@ -77,19 +84,37 @@ local record FluidStorageWrapper
   FluidStorage: FluidStorage | nil
 end
 
-function FluidStorage:getFluid(slot: integer) : SlotContents
+function FluidStorage:getFluid(slot: integer) : FluidStorage.TankContents
   return self:list()[slot]
 end
 
+function FluidStorage:list(filter: Fluid | string | nil) : {FluidStorage.TankContents}
+  local list = self.peripheral.tanks() as { integer : FluidStorage.TankContents }  -- Sometimes comes with slot numbers for some reason *shrug*
+  if filter is nil then return list end
+  local id : string
+  if filter is string then id = filter
+  elseif filter is Fluid then id = filter.id
+  elseif filter is nil then return list end
+  local filtered : { FluidStorage.TankContents } = {}
+  for _,contents in pairs(list) do
+    if contents.name == id then
+      table.insert(filtered, contents)
+    end
+  end
+  return filtered
+end
+
+
+
 function FluidStorage:counts() : { string : integer}
   local counts : { string : integer }
-  for _,fluid in pairs(self:list()) do
+  for _,fluid in ipairs(self:list()) do
     if fluid ~= nil then
       local count = counts[Fluid.name]
       if count == nil then
-        counts[Fluid.name] = fluid.count
+        counts[Fluid.name] = fluid.amount
       else
-        counts[Fluid.name] = fluid.count + count
+        counts[Fluid.name] = fluid.amount + count
       end
     end
   end
@@ -118,7 +143,7 @@ function FluidStorageWrapper.new(block : FluidStorage | string): FluidStorageWra
       self.FluidStorage = FluidStorage.new(block) 
     end
   elseif block is FluidStorage then
-    self.peripheralName = FluidStorage.peripheralName
+    self.peripheralName = block.peripheralName
     self.FluidStorage = block
   end
   return self
@@ -128,21 +153,21 @@ function FluidStorage:count(fluid: Fluid | string | nil) : integer
   local count = 0
 
   if fluid is nil then
-    for _,x in pairs(self:list()) do
-      count = count + x.count
+    for _,x in ipairs(self:list()) do
+      count = count + x.amount
     end
     return count
   elseif fluid is Fluid | string then
-    for _,cursor in pairs(self:list(fluid)) do
-      count = count + cursor.count
+    for _,cursor in ipairs(self:list(fluid)) do
+      count = count + cursor.amount
     end
     return count
   end
 end
 
 function FluidStorage:find(fluid: Fluid | string) : boolean,integer | nil --Found,Count
-  for _,details in pairs(self:list(fluid)) do
-    return true, details.count
+  for _,details in ipairs(self:list(fluid)) do
+    return true, details.amount
   end
   return false
 end
@@ -173,7 +198,7 @@ function FluidStorage:pushAll(
   local total = 0
   local peripheralName = FluidStorage.getPeripheralName(to)
 
-  local toMove : { integer : SlotContents }
+  local toMove : { integer : FluidStorage.TankContents }
 
   if fluid is nil then
     toMove = self:list()
@@ -184,8 +209,10 @@ function FluidStorage:pushAll(
   for _,slot in pairs(toMove) do
     local moved = self.peripheral.pushFluid(peripheralName,count,slot.name)
     if moved == 0 then break end
-    count = count - moved
-    if count == 0 then break end
+    if count is integer then
+      count = count - moved
+      if count == 0 then break end
+    end
     total = total + moved
   end
 
@@ -195,18 +222,23 @@ end
 function FluidStorage:pushMax(
   to : FluidStorage | string, 
   fluid: Fluid | string, 
-  max: integer,
+  max: integer | nil,
   min: integer | nil) : integer
 
   local _to = FluidStorageWrapper.new(to)
 
   local count : integer
-  count = max - _to:getFluidStorage():count(fluid)
+  count = _to:getFluidStorage():count(fluid)
 
   if min is integer then
     if count > min then return 0 end
   end
 
+  if max is integer then
+    count = max - count
+  else
+    count = nil
+  end
   return self:pushAll(to, fluid, count)
 end
 
@@ -239,15 +271,16 @@ function FluidStorage:pullAll(
 
   local total = 0
 
-  local toMove : { integer : SlotContents }
+  local toMove : { integer : FluidStorage.TankContents }
 
   --If the remote storage doesn't have the Fluid API, just brute-force it
   if _from.FluidStorage == nil then
+    count = count or 1000000
     repeat
-    local moved = self.peripheral.pullFluid(_from.peripheralName, count)
-    if moved == 0 then break end
-    count = count - moved
-    total = total + moved
+      local moved = self.peripheral.pullFluid(_from.peripheralName, count)
+      if moved == 0 then break end
+      count = count - moved
+      total = total + moved
     until count <= 0
     return total
   end
@@ -260,8 +293,10 @@ function FluidStorage:pullAll(
 
   for _,slot in pairs(toMove) do
     local moved = total + self.peripheral.pullFluid(_from.peripheralName,count,slot.name)
-    count = count - moved
-    if count <= 0 then break end
+    if count is integer then
+      count = count - moved
+      if count <= 0 then break end
+    end
     total = total + moved
   end
   return total

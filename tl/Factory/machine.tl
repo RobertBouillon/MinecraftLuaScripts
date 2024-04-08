@@ -1,6 +1,6 @@
-require "v2/Factory/Item"
-require "v2/Factory/Recipe"
-require "v2/Storage"
+require "tl/Factory/Item"
+require "tl/Factory/Recipe"
+require "tl/Storage"
 
 global record MachineType
   type machineWorker = function(self:Machine, storage : Storage, recipe : Recipe)
@@ -14,6 +14,15 @@ global record MachineType
 
   worker: machineWorker
   clearer: machineWorker
+end
+
+function MachineType.parse(name : string) : string
+  local lastIndex = name:match(".*()%_") as integer
+  if lastIndex then
+      return name:sub(1, lastIndex - 1)
+  else
+      return name
+  end
 end
 
 global record Machine
@@ -39,24 +48,37 @@ function Machine.new(machineType: MachineType | nil) : Machine
 end
 
 local function defaultWorker(machine:Machine, storage : Storage, recipe : Recipe)
+  --Local storage should always have the APIs
+  local item = storage.item as ItemStorage
+  local fluid = storage.fluid as FluidStorage
+
   if recipe.thing:is("Item") then
-    storage.item:pullAll(machine.storage.item, recipe.thing as Item)
+    item:pullAll(machine.storage.item, recipe.thing as Item)
   elseif recipe.thing:is("Fluid") then
-    storage.fluid:pullAll(machine.storage.fluid, recipe.thing as Fluid)
+    fluid:pullAll(machine.storage.fluid, recipe.thing as Fluid)
   end
 
   for _,thing in ipairs(recipe.inputs) do
     if thing:is("Item") then
-      storage.item:pushMax(machine.storage.item, thing as Item, 32, nil, 16)
+      item:pushMax(machine.storage.item, thing as Item, 32, nil, 16)
     elseif thing:is("Fluid") then
-      storage.item:pushMax(machine.storage.item, thing as Item, 4000, nil, 2000)
+      fluid:pushMax(machine.storage.fluid, thing as Fluid, 4000, 2000)
     end
   end
 end
 
 local function defaultClearer(machine:Machine, storage : Storage)
-  storage.item:pullAll(machine.storage.item)
-  storage.fluid:pullAll(machine.storage.fluid)
+  --Local storage should always have the APIs
+  local item = storage.item as ItemStorage
+  local fluid = storage.fluid as FluidStorage
+
+  --Pull can error if the API doesn't exist. Depends on the machine's implementation
+  if type(machine.storage.item) ~= "string" then
+    item:pullAll(machine.storage.item)
+  end
+  if type(machine.storage.fluid) ~= "string" then
+    fluid:pullAll(machine.storage.fluid)
+  end
 end
 
 function MachineType.new(id : string, name : string, worker : MachineType.machineWorker | nil, clearer : MachineType.machineClearer | nil) : MachineType
@@ -65,6 +87,7 @@ function MachineType.new(id : string, name : string, worker : MachineType.machin
   self.name = name
   self.worker = worker or defaultWorker
   self.clearer = clearer or defaultClearer
+  return self
 end
 
 
@@ -128,13 +151,4 @@ end
 --   end
 -- end
 
-
--- local function parseTypeFromName(name : string) : string
---   local lastIndex = name:match(".*()%_") as integer
---   if lastIndex then
---       return name:sub(1, lastIndex - 1)
---   else
---       return name
---   end
--- end
 
