@@ -63,6 +63,14 @@ FluidStorage = {TankContents = {}, }
 
 
 
+
+
+
+
+
+
+
+
 function FluidStorage.new(peripheralName)
    local self = setmetatable({}, { __index = FluidStorage })
    self.peripheralName = peripheralName
@@ -181,8 +189,9 @@ function FluidStorage:push(   to,
    local fluidName = Fluid.getName(fluid)
    local peripheralName = FluidStorage.getPeripheralName(to)
 
-   local found = self:find(Fluid)
+   local found = self:find(fluid)
    if found then
+      print(peripheralName, count, fluidName)
       return self.peripheral.pushFluid(peripheralName, count, fluidName)
    else
       return 0
@@ -222,13 +231,11 @@ function FluidStorage:pushMax(   to,
    max,
    min)
 
-   local _to = FluidStorageWrapper.new(to)
-
    local count
-   count = _to:getFluidStorage():count(fluid)
+   count = self:count(fluid)
 
    if math.type(min) == "integer" then
-      if count > min then return 0 end
+      if count < min then return 0 end
    end
 
    if math.type(max) == "integer" then
@@ -236,7 +243,8 @@ function FluidStorage:pushMax(   to,
    else
       count = nil
    end
-   return self:pushAll(to, fluid, count)
+
+   return self:push(to, fluid, count)
 end
 
 function FluidStorage:pull(   from,
@@ -249,7 +257,7 @@ function FluidStorage:pull(   from,
    if _from.FluidStorage == nil then
       return self.peripheral.pullFluid(_from.peripheralName, count, fluidName)
    else
-      local found = _from:getFluidStorage():find(Fluid)
+      local found = _from:getFluidStorage():find(fluid)
       if found then
          return self.peripheral.pullFluid(_from.peripheralName, count, fluidName)
       else
@@ -295,4 +303,26 @@ function FluidStorage:pullAll(   from,
       total = total + moved
    end
    return total
+end
+
+function FluidStorage:pullMax(   from,
+   fluid,
+   max,
+   min)
+
+   local peripheralName = FluidStorage.getPeripheralName(from)
+
+   local count
+   count = self:count(fluid)
+
+   if math.type(min) == "integer" then
+      if count > min then return 0 end
+   end
+
+   if math.type(max) == "integer" then
+      count = max - count
+   else
+      count = nil
+   end
+   return self:pullAll(peripheralName, fluid, count)
 end

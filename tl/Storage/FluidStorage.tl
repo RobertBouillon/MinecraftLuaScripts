@@ -61,6 +61,14 @@ global record FluidStorage
     --toSlot: integer | nil
   ) : integer
 
+  pullMax: function(
+    self: FluidStorage,
+    from : FluidStorage | string, 
+    fluid: Fluid | string, 
+    max: integer | nil,
+    --toSlot: integer | nil,
+    min: integer | nil) : integer
+
 end
 
 function FluidStorage.new(peripheralName: string): FluidStorage
@@ -182,8 +190,9 @@ function FluidStorage:push(
   local fluidName = Fluid.getName(fluid)
   local peripheralName = FluidStorage.getPeripheralName(to)
 
-  local found = self:find(Fluid)
+  local found = self:find(fluid)
   if found then
+    print(peripheralName,count,fluidName)
     return self.peripheral.pushFluid(peripheralName,count,fluidName)
   else
     return 0
@@ -225,13 +234,11 @@ function FluidStorage:pushMax(
   max: integer | nil,
   min: integer | nil) : integer
 
-  local _to = FluidStorageWrapper.new(to)
-
   local count : integer
-  count = _to:getFluidStorage():count(fluid)
+  count = self:count(fluid)
 
   if min is integer then
-    if count > min then return 0 end
+    if count < min then return 0 end
   end
 
   if max is integer then
@@ -239,7 +246,8 @@ function FluidStorage:pushMax(
   else
     count = nil
   end
-  return self:pushAll(to, fluid, count)
+
+  return self:push(to, fluid, count)
 end
 
 function FluidStorage:pull(
@@ -253,7 +261,7 @@ function FluidStorage:pull(
   if _from.FluidStorage == nil then
     return self.peripheral.pullFluid(_from.peripheralName,count,fluidName)
   else
-    local found = _from:getFluidStorage():find(Fluid)
+    local found = _from:getFluidStorage():find(fluid)
     if found then
       return self.peripheral.pullFluid(_from.peripheralName,count,fluidName)
     else
@@ -302,3 +310,25 @@ function FluidStorage:pullAll(
   return total
 end
 
+function FluidStorage:pullMax(
+  from : FluidStorage | string, 
+  fluid: Fluid | string, 
+  max: integer | nil,
+  min: integer | nil) : integer
+
+  local peripheralName = FluidStorage.getPeripheralName(from)
+
+  local count : integer
+  count = self:count(fluid)
+
+  if min is integer then
+    if count > min then return 0 end
+  end
+
+  if max is integer then
+    count = max - count
+  else
+    count = nil
+  end
+  return self:pullAll(peripheralName, fluid, count)
+end

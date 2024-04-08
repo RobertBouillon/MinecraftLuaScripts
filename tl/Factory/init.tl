@@ -9,10 +9,10 @@ global record Factory
   storage: Storage
   runlog : { Thing : string }
 
-  machinePool: { string : {Machine} }
+  machinePool: { MachineType : {Machine} }
   dedicatedMachines: { Thing : Machine }
 
-  assignedMachines: { Thing : Machine }
+  activeMachines: { Thing : Machine }
 end
 
 function Factory.new(
@@ -26,28 +26,38 @@ function Factory.new(
 
   self.machinePool = {}
   self.dedicatedMachines = {}
-  self.assignedMachines = {}
+  self.activeMachines = {}
   return self
 end
 
-function Factory:addToPool(machine: Machine)
-  local machines = self.machinePool[machine.type.id]
+function Factory:addToPool(machine : Machine)
+  local machines = self.machinePool[machine.type]
   if machines == nil then
     machines = {}
-    self.machinePool[machine.type.id] = machines
+    self.machinePool[machine.type] = machines
   end
   table.insert(machines, machine)
 end
 
-function Factory:assign(thing: Thing, machineType : string) : Machine
+function Factory:assign(thing: Thing, machineType : MachineType) : boolean
+  --Check for dedicated machine
+  local dedicatedMachine = self.dedicatedMachines[thing]
+  if dedicatedMachine ~= nil then
+    self.activeMachines[thing] = dedicatedMachine
+    return true
+  end
+
+  --Try to pull a machine from the pool
   local machines = self.machinePool[machineType]
-  if machines == nil then return nil end
-  if #machines == 0 then return nil end
+  if machines == nil then return false end
+  if #machines == 0 then return false end
+
   local i = #machines
   local machine = machines[i]
-  self.assignedMachines[thing] = machine
   table.remove(machines, i)
-  return machine;
+
+  self.activeMachines[thing] = machine
+  return true;
 end
 
 function Factory:detectMachines(machineTypes : {MachineType})
@@ -59,7 +69,7 @@ function Factory:detectMachines(machineTypes : {MachineType})
   for _,id in ipairs(peripheral.getNames()) do
     local machineType = index[MachineType.parse(id)]
     if machineType is MachineType then
-      self:addToPool(PeripheralMachine.new(id,machineType) as Machine)
+      self:addToPool(Machine.new(machineType,id) as Machine)
     end
   end
 end
@@ -67,18 +77,16 @@ end
 function Factory:clearMachines()
   for _,machines in pairs(self.machinePool) do
     for _,machine in ipairs(machines) do
-      print("Clearing " .. machine.type.name)
-      machine:clear(self.storage)
+       machine:clear(self.storage)
     end
   end
   for _,machine in pairs(self.dedicatedMachines) do
-    print("Clearing " .. machine.type.name)
     machine:clear(self.storage)
   end
 end
 
 function Factory:canMake(recipe: Recipe) : boolean, string
-  for _,thing in ipairs(recipe.inputs) do
+  for _,thing in ipairs(recipe.itemsIn) do
     if not self.storage:contains(thing) then
       return false, "Missing " .. thing.name
     end
@@ -128,20 +136,9 @@ function Factory:startMaking(thing : Thing) : boolean
       return false
     else
       local machineType = recipe.machineType
-      if machineType is string then
-        local assignedMachine = self:assign(thing, machineType)
-        if assignedMachine == nil then
-          self.runlog[thing] = "No " .. machineType .. " available"  --TODO: This should be a formatted name.
-          return false
-        end
-      elseif machineType is function(...:string) then
-        local dedicatedMachine = self.dedicatedMachines[thing]
-        if dedicatedMachine == nil then
-          self.runlog[thing] = "'" .. thing.name .. "'s' requires a dedicated machine"
-          return false
-        else
-          self.assignedMachines[thing] = dedicatedMachine
-        end
+      if not self:assign(thing, machineType) then
+        self.runlog[thing] = "No " .. machineType.name .. " available"
+        return false
       end
     end
   end
@@ -149,8 +146,8 @@ function Factory:startMaking(thing : Thing) : boolean
 end
 
 function Factory:stopMaking(thing : Thing)
-  local machine = self.assignedMachines[thing]
-  self.assignedMachines[thing] = nil
+  local machine = self.activeMachines[thing]
+  self.activeMachines[thing] = nil
   machine:clear(self.storage)
   self.runlog[thing] = nil
 
@@ -161,15 +158,15 @@ function Factory:stopMaking(thing : Thing)
 end
 
 function Factory:isMaking(thing : Thing) : boolean
-  return self.assignedMachines[thing] ~= nil
+  return self.activeMachines[thing] ~= nil
 end
 
 function Factory:checkQuotas()
   for thing,amount in pairs(self.quotas) do
     local count = self.storage:count(thing)
-    self.runlog[thing] = count .. "/" .. amount
     
     if count < amount then
+      self.runlog[thing] = count .. "/" .. amount
       if not self:isMaking(thing) then   
         self:startMaking(thing)
       end
@@ -177,28 +174,29 @@ function Factory:checkQuotas()
       if self:isMaking(thing) then
         self:stopMaking(thing)
       end
+      self.runlog[thing] = nil
     end
   end
 end
 
 function Factory:runMachines()
-  for thing,machine in pairs(self.assignedMachines) do
-    machine:work(self.storage, self.recipes[thing])
+  for thing,machine in pairs(self.activeMachines) do
+    local recipe = self.recipes[thing]
+    machine:work(self.storage, recipe.itemsIn, recipe.itemsOut)
   end
 end
 
-function Factory:addDedicatedMachine(thing : Thing, ... : string)
+function Factory:addDedicatedMachine(thing : Thing, ... : string | integer)
   local recipe = self.recipes[thing]
-  local machineType = recipe.machineType
-  if machineType is string then 
-    error("'" .. thing.name .. "' is not configured for a dedicated machine") 
-  elseif machineType is function(...:string) : Machine then
-    self.dedicatedMachines[thing] = machineType(...)
-  end
+  self.dedicatedMachines[thing] = Machine.new(recipe.machineType, ...)
+end
+
+function Factory:addCompositeMachine(machineType : MachineType, ... : string | integer)
+  self:addToPool(Machine.new(machineType,...))
 end
 
 function Factory:run()
-  --self:clearMachines()
+  self:clearMachines()
 
   while true do
     self:checkQuotas()

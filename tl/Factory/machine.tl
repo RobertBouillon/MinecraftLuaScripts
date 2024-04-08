@@ -1,19 +1,26 @@
 require "tl/Factory/Item"
-require "tl/Factory/Recipe"
 require "tl/Storage"
+require "tl/Common"
 
 global record MachineType
-  type machineWorker = function(self:Machine, storage : Storage, recipe : Recipe)
-  type machineClearer = function(self:Machine, storage : Storage)
+  type machineWorker = function(machine : Machine, storage : Storage, itemsIn : {Thing}, itemsOut: {Thing})
+  type machineClearer = function(machine : Machine, storage : Storage)
 
-  new: function(id : string, name : string, worker : machineWorker | nil, clearer : machineClearer | nil) : MachineType
+  new: function(name : string, id : string) : MachineType
+  newComposite: function(name : string, ...:MachineType) : MachineType
   parse: function(name : string) : string
+  is: function(self: MachineType, peripheralName : string) : boolean
 
   id : string
   name : string
-
+  types : {MachineType}
+  
   worker: machineWorker
   clearer: machineWorker
+end
+
+function MachineType:is(peripheralName : string) : boolean
+  return self.parse(peripheralName) == self.id
 end
 
 function MachineType.parse(name : string) : string
@@ -26,43 +33,71 @@ function MachineType.parse(name : string) : string
 end
 
 global record Machine
-  new: function(machineType: MachineType | nil) : Machine
+  new: function(machineType: MachineType, ...:string|integer) : Machine
 
   type: MachineType
-  storage : Storage
-  work: MachineType.machineWorker
-  clear: MachineType.machineWorker
+  peripherals : {string}
+  storage : {Storage}
+  work: function(self:Machine, storage : Storage, itemsIn : {Thing}, itemsOut: {Thing})
+  clear: function(self:Machine, storage : Storage)
 end
 
-function Machine.new(machineType: MachineType | nil) : Machine
+function Machine.new(machineType: MachineType, ... : string | integer) : Machine
   local self: Machine = setmetatable({}, { __index = Machine })
   self.type = machineType
-
-  if machineType is MachineType then
-    self.work = machineType.worker
-  end   --Need two type guards due to parsing bug :(
-  if machineType is MachineType then
-    self.clear = machineType.clearer
+  self.storage = {}
+  self.peripherals = {}
+  for i,x in ipairs({...}) do
+    if x is integer then 
+      table.insert(self.peripherals, machineType.types[i].id .. "_" .. x)
+    elseif x is string then
+      table.insert(self.peripherals, x)
+    end
   end
+
+  local expected = #self.type.types
+  local specified = #self.peripherals
+  if specified ~= expected then
+    traceStack()
+    error(expected .. " peripherals expected for " .. self.type.name)
+  end
+
+  for i,p in ipairs(self.peripherals) do
+    if MachineType.parse(p) ~= self.type.types[i].id then
+      error("Machine "..i.." is not a "..self.type.types[i].name)
+    end
+    table.insert(self.storage, Storage.new(p))
+  end
+
   return self
 end
 
-local function defaultWorker(machine:Machine, storage : Storage, recipe : Recipe)
+function Machine:work(storage : Storage, itemsIn : {Thing}, itemsOut: {Thing})
+  self.type.worker(self,storage,itemsIn,itemsOut)
+end
+
+function Machine:clear(storage : Storage)
+  self.type.clearer(self,storage)
+end
+
+local function defaultWorker(machine:Machine, storage : Storage, itemsIn:{Thing}, itemsOut:{Thing})
   --Local storage should always have the APIs
   local item = storage.item as ItemStorage
   local fluid = storage.fluid as FluidStorage
 
-  if recipe.thing:is("Item") then
-    item:pullAll(machine.storage.item, recipe.thing as Item)
-  elseif recipe.thing:is("Fluid") then
-    fluid:pullAll(machine.storage.fluid, recipe.thing as Fluid)
+  for _,thing in ipairs(itemsOut) do
+      if thing:is("Item") then
+      item:pullAll(machine.storage[1].item, thing as Item)
+    elseif thing:is("Fluid") then
+      fluid:pullAll(machine.storage[1].fluid, thing as Fluid)
+    end
   end
 
-  for _,thing in ipairs(recipe.inputs) do
+  for _,thing in ipairs(itemsIn) do
     if thing:is("Item") then
-      item:pushMax(machine.storage.item, thing as Item, 32, nil, 16)
+      item:pushMax(machine.storage[1].item, thing as Item, 32, nil, 16)
     elseif thing:is("Fluid") then
-      fluid:pushMax(machine.storage.fluid, thing as Fluid, 4000, 2000)
+      fluid:pushMax(machine.storage[1].fluid, thing as Fluid, 4000, 2000)
     end
   end
 end
@@ -73,82 +108,29 @@ local function defaultClearer(machine:Machine, storage : Storage)
   local fluid = storage.fluid as FluidStorage
 
   --Pull can error if the API doesn't exist. Depends on the machine's implementation
-  if type(machine.storage.item) ~= "string" then
-    item:pullAll(machine.storage.item)
+  if type(machine.storage[1].item) ~= "string" then
+    item:pullAll(machine.storage[1].item)
   end
-  if type(machine.storage.fluid) ~= "string" then
-    fluid:pullAll(machine.storage.fluid)
+  if type(machine.storage[1].fluid) ~= "string" then
+    fluid:pullAll(machine.storage[1].fluid)
   end
 end
 
-function MachineType.new(id : string, name : string, worker : MachineType.machineWorker | nil, clearer : MachineType.machineClearer | nil) : MachineType
+function MachineType.new(name : string, id : string) : MachineType
   local self: MachineType = setmetatable({}, { __index = MachineType })
   self.id = id
   self.name = name
-  self.worker = worker or defaultWorker
-  self.clearer = clearer or defaultClearer
+  self.types = {self}
+  self.worker = defaultWorker
+  self.clearer = defaultClearer
   return self
 end
 
-
-
-
-global record PeripheralMachine
-  new: function(peripheralID : string, machineType: MachineType) : PeripheralMachine
-
-  --Inherited
-  type: MachineType
-  storage : Storage
-  work: MachineType.machineWorker
-  clear: MachineType.machineClearer
-end
-setmetatable(PeripheralMachine, {__index = Machine})
-
-function PeripheralMachine.new(peripheralID : string, machineType: MachineType) : PeripheralMachine
-  local self: PeripheralMachine = setmetatable(Machine.new(machineType) as PeripheralMachine, { __index = PeripheralMachine })
-  self.storage = Storage.new(peripheralID)
-
-  if MachineType.parse(peripheralID) ~= machineType.id then
-    error("'" .. MachineType.parse(peripheralID) .. "' is not a '" .. machineType.name .. "'")
-  end
-
+function MachineType.newComposite(name : string, ... : MachineType) : MachineType
+  local self: MachineType = setmetatable({}, { __index = MachineType })
+  self.name = name
+  self.types = {...}
+  self.worker = defaultWorker
+  self.clearer = defaultClearer
   return self
 end
-
-
-
---Push things to a machine from storage
--- function Factory:push(
---   machine: Machine, 
---   thing: Thing, 
---   max: integer | nil, 
---   toSlot: integer | nil, 
---   min: integer | nil
--- ) : integer
---   if thing:is("Item") then
---     local item = thing as Item
---     if max is integer then
---       return self.itemStorage:pushMax(machine.peripheralName, item, max, toSlot, min)
---     else
---       return self.itemStorage:push(machine.peripheralName, item, nil, toSlot)
---     end
---   elseif thing:is("Fluid") then
---     local fluid = thing as Fluid
---     if max is integer then
---       return self.fluidStorage:pushMax(machine.peripheralName, fluid, max, min)
---     else
---       return self.fluidStorage:push(machine.peripheralName, fluid, nil)
---     end
---   end
--- end
-
--- --Pull things from a machine to storage
--- function Factory:pull(machine: Machine, thing: Thing) : integer
---   if thing:is("Item") then
---     return self.itemStorage:pull(machine.peripheralName, thing as Item)
---   elseif thing:is("Fluid") then
---     return self.fluidStorage:push(machine.peripheralName, thing as Fluid)
---   end
--- end
-
-

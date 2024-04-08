@@ -14,8 +14,13 @@ function repack(source)
 end
 
 function traceStack()
-   print(debug.getinfo(3).name)
-   print(debug.getinfo(2).name)
-   print(debug.getinfo(1).name)
+   local i = 2
+   while true do
+      local frame = debug.getinfo(i)
+      if frame == nil then break end
+      if frame.name == nil then break end
+      print(frame.name)
+      i = i + 1
+   end
    print("---")
 end

@@ -1,8 +1,24 @@
 local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 then local p, m = pcall(require, 'compat53.module'); if p then _tl_compat = m end end; local ipairs = _tl_compat and _tl_compat.ipairs or ipairs; local math = _tl_compat and _tl_compat.math or math; local pairs = _tl_compat and _tl_compat.pairs or pairs; require("tl/Factory/Item")
 require("tl/Storage/Common")
 require("tl/ccapi")
+require("tl/common")
 
 ItemStorage = {SlotContents = {}, }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -142,6 +158,7 @@ end
 function ItemStorageWrapper:getItemStorage()
    local itemStorage = self.itemStorage
    if type(itemStorage) == "table" then return itemStorage end
+   traceStack()
    error("'" .. self.peripheralName .. "' does not support the inventory API")
 end
 
@@ -176,7 +193,8 @@ function ItemStorage:count(item)
       end
       return count
    elseif math.type(item) == "integer" then
-      return self:getItem(item).count
+      local contents = self:getItem(item)
+      if contents == nil then return 0 else return contents.count end
    elseif type(item) == "table" then
       for _, cursor in pairs(self:list(item)) do
          count = count + cursor.count
@@ -247,8 +265,10 @@ function ItemStorage:pushAll(   to,
    local total = 0
    for slot in pairs(toMove) do
       local moved = total + self.peripheral.pushItems(peripheralName, slot, count, toSlot)
-      count = count - moved
-      if count == 0 then break end
+      if math.type(count) == "integer" then
+         count = count - moved
+         if count == 0 then break end
+      end
       total = total + moved
    end
    return total
@@ -273,7 +293,7 @@ function ItemStorage:pushMax(   to,
    end
 
    if math.type(min) == "integer" then
-      if count > min then return 0 end
+      if count < min then return 0 end
    end
 
    if math.type(max) == "integer" then
@@ -283,6 +303,31 @@ function ItemStorage:pushMax(   to,
    end
 
    return self:pushAll(to, item, count, toSlot)
+end
+
+function ItemStorage:pushSlots(   to,
+   item,
+   startingSlot,
+   toSlot)
+
+   local peripheralName = ItemStorage.getPeripheralName(to)
+
+   local toMove
+   if item == nil then
+      toMove = self:list()
+   elseif type(item) == "table" then
+      toMove = self:list(item)
+   end
+
+   local total = 0
+
+   for slot in pairs(toMove) do
+      if slot >= startingSlot then
+         local moved = total + self.peripheral.pushItems(peripheralName, slot, nil, toSlot)
+         total = total + moved
+      end
+   end
+   return total
 end
 
 function ItemStorage:pull(   from,
@@ -313,13 +358,28 @@ function ItemStorage:pullAll(   from,
 
    local toMove
 
+   local total = 0
+
+   if _from.itemStorage == nil then
+      if math.type(item) == "integer" then
+         count = count or 1000000
+         repeat
+            local moved = self.peripheral.pullItems(_from.peripheralName, item, count)
+            if moved == 0 then break end
+            count = count - moved
+            total = total + moved
+         until count <= 0
+         return total
+      else
+         error(_from.peripheralName .. " does not support the inventory API. Slot number is required")
+      end
+   end
+
    if item == nil then
       toMove = _from:getItemStorage():list()
    elseif type(item) == "table" then
       toMove = _from:getItemStorage():list(item)
    end
-
-   local total = 0
 
    for slot in pairs(toMove) do
       local moved = total + self.peripheral.pullItems(_from.peripheralName, slot, count, toSlot)
@@ -332,6 +392,35 @@ function ItemStorage:pullAll(   from,
    return total
 end
 
+function ItemStorage:pullMax(   from,
+   item,
+   max,
+   toSlot,
+   min)
+
+   local peripheralName = ItemStorage.getPeripheralName(from)
+
+   local count
+   if toSlot == nil then
+      count = self:count(item)
+   elseif math.type(toSlot) == "integer" then
+      count = self:count(toSlot)
+   else
+      error(type(toSlot))
+   end
+
+   if math.type(min) == "integer" then
+      if count < min then return 0 end
+   end
+
+   if math.type(max) == "integer" then
+      count = max - count
+   else
+      count = nil
+   end
+
+   return self:pull(peripheralName, item, count, toSlot)
+end
 
 function ItemStorage:pullSlots(   from,
    item,

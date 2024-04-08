@@ -15,7 +15,7 @@ local Things = {
    MenrilSapling = Item.new("integrateddynamics:menril_sapling", "Menril Sapling"),
    MenrilCrystal = Item.new("integrateddynamics:crystalized_menril_chunk", "Crystalized Menril Chunk"),
    SulfurDust = Item.new("mekanism:dust_sulfur", "Sulfur Dust"),
-   Mushroom = Item.new("minecraft:red_mushroom", "Red_mushroom"),
+   Mushroom = Item.new("minecraft:red_mushroom", "Mushroom"),
    Potato = Item.new("minecraft:potato", "Potato"),
    OakSapling = Item.new("minecraft:oak_sapling", "Oak Sapling"),
    OakLog = Item.new("minecraft:oak_log", "Oak Log"),
@@ -44,121 +44,161 @@ local Things = {
 }
 
 local Machines = {
-   FluidExtractor = MachineType.new("industrialforegoing:fluid_extractor", "Fluid Extractor"),
-   BlockPlacer = MachineType.new("industrialforegoing:block_placer", "Block Placer"),
-   LiquidBlazeBurner = MachineType.new("createaddition:liquid_blaze_burner", "Liquid Blaze Burner"),
-   Thermo = MachineType.new("pneumaticcraft:thermopneumatic_processing_plant", "Spores Recreator"),
-   Mixer = MachineType.new("pneumaticraft:fluid_mixerc", "Latex Pro,cessing Unit"),
-   Crafter = MachineType.new("thermal:machine_crafter", "Crafter"),
-   Crafter3 = MachineType.new("rftoolsutility:crafter3", "Crafter (3)"),
 
-   SuperCooler = MachineType.new("rftoolsutility:ftbsba:super_cooler", "Super Cooler"),
-   SporesRecreator = MachineType.new("industrialforegoing:spores_recreator", "Spores Recreator"),
-   LatexProcessingUnit = MachineType.new("industrialforegoing:latex_processing_unit", "Latex Processing Unit"),
-   MechanicalSqueezer = MachineType.new("integrateddynamics:mechanical_squeezer", "Mechanical Squeezer"),
-   PhytogenicInsolator = MachineType.new("thermal:machine_insolator", "Phytogenic Insolator"),
-   Pulverizer = MachineType.new("thermal:machine_pulverizer", "Pulverizer"),
-   FluidEncapsulator = MachineType.new("thermal:machine_bottler", "Fluid Encapsulator"),
-   RedstoneFurnace = MachineType.new("thermal:machine_furnace", "Redstone Furnace"),
-   MagmaCrucible = MachineType.new("thermal:machine_crucible", "Magma Crucible"),
-   Pyrolyzer = MachineType.new("thermal:machine_pyrolyzer", "Pyrolyzer"),
+   SuperCooler = MachineType.new("Super Cooler", "rftoolsutility:ftbsba:super_cooler"),
+   SporesRecreator = MachineType.new("Spores Recreator", "industrialforegoing:spores_recreator"),
+   LatexProcessingUnit = MachineType.new("Latex Processing Unit", "industrialforegoing:latex_processing_unit"),
+   MechanicalSqueezer = MachineType.new("Mechanical Squeezer", "integrateddynamics:mechanical_squeezer"),
+   PhytogenicInsolator = MachineType.new("Phytogenic Insolator", "thermal:machine_insolator"),
+   Pulverizer = MachineType.new("Pulverizer", "thermal:machine_pulverizer"),
+   FluidEncapsulator = MachineType.new("Fluid Encapsulator", "thermal:machine_bottler"),
+   RedstoneFurnace = MachineType.new("Redstone Furnace", "thermal:machine_furnace"),
+   MagmaCrucible = MachineType.new("Magma Crucible", "thermal:machine_crucible"),
+   Pyrolyzer = MachineType.new("Pyrolyzer", "thermal:machine_pyrolyzer"),
+
+
+   FluidExtractor = MachineType.new("Fluid Extractor", "industrialforegoing:fluid_extractor"),
+   BlockPlacer = MachineType.new("Block Placer", "industrialforegoing:block_placer"),
+   LiquidBlazeBurner = MachineType.new("Liquid Blaze Burner", "createaddition:liquid_blaze_burner"),
+   Thermo = MachineType.new("Spores Recreator", "pneumaticcraft:thermopneumatic_processing_plant"),
+   Mixer = MachineType.new("Latex Processing Unit", "pneumaticraft:latex_processing_unit"),
+   Crafter = MachineType.new("Crafter", "thermal:machine_crafter"),
+   Crafter3 = MachineType.new("Crafter (3)", "rftoolsutility:crafter3"),
+}
+
+local CompositeMachines = {
+   LatexMaker = MachineType.newComposite("Latex Maker", Machines.BlockPlacer, Machines.FluidExtractor),
+   HotThermo = MachineType.newComposite("Hot Thermo", Machines.Thermo, Machines.LiquidBlazeBurner),
 }
 
 
 
 
+Machines.SporesRecreator.worker = function(machine, storage)
 
-LatexMachine = {}
-
-
-
-
-
-
-
-
-
-
-
-
-setmetatable(LatexMachine, { __index = Machine })
-
-function LatexMachine.new(placerID, extractorID)
-   local self = setmetatable(Machine.new(), { __index = LatexMachine })
-   self.placer = PeripheralMachine.new(placerID, Machines.BlockPlacer)
-   self.extractor = PeripheralMachine.new(extractorID, Machines.FluidExtractor)
-   return self
+   local m = machine.storage[1]
+   m.item:pushSlots(storage.item, nil, 6)
+   m.fluid:pullMax(storage.fluid, Things.Water, nil, 500)
+   m.item:pullMax(storage.item, Things.Mushroom, 64, 3, 32)
 end
 
-function LatexMachine:work(storage)
-   local s = storage
-
-   s.item:pushMax(self.placer.storage.item, Things.OakLog, 1)
-   s.fluid:pullAll(self.extractor.storage.fluid, Things.Latex)
+Machines.SporesRecreator.clearer = function(machine, storage)
+   local m = machine.storage[1]
+   m.item:pushAll(storage.item)
+   m.fluid:pushAll(storage.fluid)
 end
 
-function LatexMachine:clear(storage)
-   local s = storage
-
-   s.item:pullAll(self.placer.storage.item, Things.OakLog)
-   s.fluid:pullAll(self.extractor.storage.fluid, Things.Latex)
-end
-
-
-
-Machines.PhytogenicInsolator.worker = function(machine, storage, recipe)
+Machines.PhytogenicInsolator.worker = function(machine, storage, itemsIn)
 
    local item = storage.item
    local fluid = storage.fluid
 
-   item:pullSlots(machine.storage.item, nil, 3)
+   item:pullSlots(machine.storage[1].item, nil, 3)
 
-   for _, thing in ipairs(recipe.inputs) do
+   for _, thing in ipairs(itemsIn) do
       if thing:is("Item") then
-         item:pushMax(machine.storage.item, thing, 16, nil, 8)
+         item:pushMax(machine.storage[1].item, thing, 16, nil, 8)
       elseif thing:is("Fluid") then
-         fluid:pushMax(machine.storage.fluid, thing, nil, 8000)
+         fluid:pushMax(machine.storage[1].fluid, thing, nil, 8000)
       end
    end
 end
 
 
+CompositeMachines.LatexMaker.worker = function(machine, storage)
+   local placer = machine.storage[1].item
+   local extractor = machine.storage[2].fluid
+   local s = storage
+
+   placer:pullMax(s.item, Things.OakLog, 1)
+   extractor:pushMax(s.fluid, Things.Latex, nil, 950)
+end
+
+CompositeMachines.LatexMaker.clearer = function(machine, storage)
+   local placer = machine.storage[1].item
+   local extractor = machine.storage[2].fluid
+   local s = storage
+
+   placer:pushAll(s.item, Things.OakLog)
+   extractor:pushAll(s.fluid, Things.Latex)
+end
+
+
+CompositeMachines.HotThermo.worker = function(machine, storage, itemsIn, itemsOut)
+   local thermo = machine.storage[1]
+   local burner = machine.storage[2]
+   local s = storage
+
+   s.fluid:pushMax(burner.fluid, Things.Biodiesel, 1000, 100)
+
+
+
+   for _, thing in ipairs(itemsIn) do
+      if thing:is("Item") then
+         s.item:push(thermo.item, thing)
+      else
+         s.fluid:push(thermo.fluid, thing)
+      end
+   end
+
+   for _, thing in ipairs(itemsOut) do
+      if thing:is("Item") then
+         s.item:pull(thermo.item, 1)
+         break
+      end
+   end
+end
+
+CompositeMachines.HotThermo.clearer = function(machine, storage)
+   local thermo = machine.storage[1]
+   local burner = machine.storage[2]
+   local s = storage
+
+   s.fluid:pullAll(thermo.fluid)
+   s.item:pull(thermo.item, 1)
+   s.fluid:pullAll(burner.fluid)
+end
+
 
 
 
 local Recipes = {
-   Recipe.new(Things.Mushroom, Machines.SporesRecreator.id, Things.Mushroom, Things.Water),
-   Recipe.new(Things.Potato, Machines.PhytogenicInsolator.id, Things.Potato, Things.Water),
-   Recipe.new(Things.OakLog, Machines.PhytogenicInsolator.id, Things.OakSapling, Things.Water),
-   Recipe.new(Things.RawSilver, Machines.SuperCooler.id, Things.ManaPowder, Things.Quicksilver),
-   Recipe.new(Things.Quicksilver, Machines.Thermo.id, Things.Cinnabar, Things.MenrilResin),
-   Recipe.new(Things.Acetaldehyde, Machines.Mixer.id, Things.MoltenSilver, Things.Ethanol),
-   Recipe.new(Things.PhelonicResin, Machines.Mixer.id, Things.Latex, Things.Acetaldehyde),
-   Recipe.new(Things.Duroplast, Machines.FluidEncapsulator.id, Things.Paper, Things.PhelonicResin),
-   Recipe.new(Things.TinyRubber, Machines.LatexProcessingUnit.id, Things.Latex, Things.Water),
-   Recipe.new(Things.Yeast, Machines.Thermo.id, Things.Mushroom, Things.Water),
-   Recipe.new(Things.VegetableOil, Machines.Thermo.id, Things.Potato),
-   Recipe.new(Things.Ethanol, Machines.Thermo.id, Things.Potato, Things.Yeast),
-   Recipe.new(Things.Biodiesel, Machines.Mixer.id, Things.VegetableOil, Things.Ethanol),
-   Recipe.new(Things.Ethylene, Machines.Thermo.id, Things.SulfurDust, Things.Ethanol),
-   Recipe.new(Things.Polyethylene, Machines.Mixer.id, Things.Ethylene, Things.Latex),
-   Recipe.new(Things.MenrilLog, Machines.PhytogenicInsolator.id, Things.MenrilSapling, Things.Water),
-   Recipe.new(Things.ForceLog, Machines.PhytogenicInsolator.id, Things.ForceSapling, Things.Water),
-   Recipe.new(Things.ForcePlanks, Machines.Crafter3.id, Things.ForceLog),
-   Recipe.new(Things.DryRubber, Machines.Crafter3.id, Things.TinyRubber),
-   Recipe.new(Things.Plastic, Machines.RedstoneFurnace.id, Things.DryRubber),
-   Recipe.new(Things.LDPE, Machines.FluidEncapsulator.id, Things.Plastic, Things.Polyethylene),
-   Recipe.new(Things.MoltenSilver, Machines.MagmaCrucible.id, Things.SilverIngot),
-   Recipe.new(Things.MenrilResin, Machines.MagmaCrucible.id, Things.MenrilCrystal),
-   Recipe.new(Things.MenrilCrystal, Machines.MechanicalSqueezer.id, Things.MenrilLog),
-   Recipe.new(Things.LiquidForce, Machines.Pyrolyzer.id, Things.ForcePlanks),
+   Recipe.new(Things.Mushroom, Machines.SporesRecreator, Things.Mushroom, Things.Water),
+   Recipe.new(Things.Potato, Machines.PhytogenicInsolator, Things.Potato, Things.Water),
+   Recipe.new(Things.OakLog, Machines.PhytogenicInsolator, Things.OakSapling, Things.Water),
+   Recipe.new(Things.RawSilver, Machines.SuperCooler, Things.ManaPowder, Things.Quicksilver),
+   Recipe.new(Things.Acetaldehyde, Machines.Mixer, Things.MoltenSilver, Things.Ethanol),
+   Recipe.new(Things.PhelonicResin, Machines.Mixer, Things.Latex, Things.Acetaldehyde),
+   Recipe.new(Things.Duroplast, Machines.FluidEncapsulator, Things.Paper, Things.PhelonicResin),
+   Recipe.new(Things.TinyRubber, Machines.LatexProcessingUnit, Things.Latex, Things.Water),
+   Recipe.new(Things.Yeast, Machines.Thermo, Things.Mushroom, Things.Water),
+   Recipe.new(Things.VegetableOil, Machines.Thermo, Things.Potato),
+   Recipe.new(Things.Ethanol, Machines.Thermo, Things.Potato, Things.Yeast),
+   Recipe.new(Things.Biodiesel, Machines.Mixer, Things.VegetableOil, Things.Ethanol),
+   Recipe.new(Things.Ethylene, Machines.Thermo, Things.SulfurDust, Things.Ethanol),
+   Recipe.new(Things.Polyethylene, Machines.Mixer, Things.Ethylene, Things.Latex),
+   Recipe.new(Things.MenrilLog, Machines.PhytogenicInsolator, Things.MenrilSapling, Things.Water),
+   Recipe.new(Things.ForceLog, Machines.PhytogenicInsolator, Things.ForceSapling, Things.Water),
+   Recipe.new(Things.ForcePlanks, Machines.Crafter3, Things.ForceLog),
+   Recipe.new(Things.DryRubber, Machines.Crafter3, Things.TinyRubber),
+   Recipe.new(Things.Plastic, Machines.RedstoneFurnace, Things.DryRubber),
+   Recipe.new(Things.LDPE, Machines.FluidEncapsulator, Things.Plastic, Things.Polyethylene),
+   Recipe.new(Things.MoltenSilver, Machines.MagmaCrucible, Things.SilverIngot),
+   Recipe.new(Things.MenrilResin, Machines.MagmaCrucible, Things.MenrilCrystal),
+   Recipe.new(Things.MenrilCrystal, Machines.MechanicalSqueezer, Things.MenrilLog),
+   Recipe.new(Things.LiquidForce, Machines.Pyrolyzer, Things.ForcePlanks),
 
-   Recipe.new(Things.Latex, LatexMachine.new, Things.OakLog, Things.Water),
+   Recipe.new(Things.Latex, CompositeMachines.LatexMaker, Things.OakLog, Things.Water),
+   Recipe.new(Things.Quicksilver, CompositeMachines.HotThermo, Things.Cinnabar, Things.MenrilResin),
 }
 
 return {
    recipes = Recipes,
    machines = {
+      HotThermo = CompositeMachines.HotThermo,
+      LatexMaker = CompositeMachines.LatexMaker,
+   },
+   detectable = {
       Machines.SuperCooler,
       Machines.SporesRecreator,
       Machines.LatexProcessingUnit,
