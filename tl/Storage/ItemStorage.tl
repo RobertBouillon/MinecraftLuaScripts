@@ -200,7 +200,7 @@ function ItemStorage:count(item: Item | string | integer | nil) : integer
     local contents = self:getItem(item)
     if contents == nil then return 0 else return contents.count end
   -- elseif item is Item | string then-- hack: https://github.com/teal-language/tl/issues/742
-    elseif type(item) == "table" or type("item") == "string" then
+    elseif item is Item or item is string then
     for _,cursor in pairs(self:list(item)) do
       count = count + cursor.count
     end
@@ -217,7 +217,7 @@ function ItemStorage:countSlots(item: Item | string | nil) : integer
     end
     return count
   -- elseif item is Item | string then -- hack: https://github.com/teal-language/tl/issues/742
-    elseif type(item) == "table" or type(item) == "string" then
+    elseif item is Item or item is string then
       for _ in pairs(self:list(item)) do
         count = count + 1
       end
@@ -244,7 +244,7 @@ function ItemStorage:push(
   --if item is string | Item then  -- hack: https://github.com/teal-language/tl/issues/742
   if item is integer then
     return self.peripheral.pushItems(peripheralName,item,count,toSlot)
-  elseif type(item) == "string" or type(item) == "table" then
+  elseif item is Item or item is string then
     local found,slot = self:find(item)
     if found then
       return self.peripheral.pushItems(peripheralName,slot,count,toSlot)
@@ -267,7 +267,7 @@ function ItemStorage:pushAll(
   if item is nil then
     toMove = self:list()
 --elseif item is Item | string then -- hack: https://github.com/teal-language/tl/issues/742
-  elseif type(item) == "string" or type(item) == "table" then
+  elseif item is Item or item is string then
     toMove = self:list(item)
   end
 
@@ -329,7 +329,7 @@ function ItemStorage:pushSlots(
   if item is nil then
     toMove = self:list()
   --elseif item is Item | string then  -- hack: https://github.com/teal-language/tl/issues/742
-  elseif type(item) == "string" or type(item) == "table" then
+  elseif item is Item or item is string then
     toMove = self:list(item)
   end
 
@@ -355,7 +355,7 @@ function ItemStorage:pull(
   if item is integer then
     return self.peripheral.pullItems(_from.peripheralName,item,count,toSlot)
   --elseif item is Item | string then  -- hack: https://github.com/teal-language/tl/issues/742
-  elseif type(item) == "string" or type(item) == "table" then
+  elseif item is Item or item is string then
     local found,slot = _from:getItemStorage():find(item)
     if found then
       return self.peripheral.pullItems(_from.peripheralName,slot,count,toSlot)
@@ -402,7 +402,7 @@ function ItemStorage:pullAll(
       toMove = {slotContents}
     end
   --elseif item is Item | string then  -- hack: https://github.com/teal-language/tl/issues/742
-  elseif type(item) == "table" or type(item) == "string" then
+  elseif item is Item or item is string then
     toMove = _from:getItemStorage():list(item)
   end
 
@@ -463,7 +463,7 @@ function ItemStorage:pullSlots(
   if item is nil then
     toMove = _from:getItemStorage():list()
   --elseif item is Item | string then   -- hack: https://github.com/teal-language/tl/issues/742
-  elseif type(item) == "string" or type(item) == "table" then
+  elseif item is Item or item is string then
     toMove = _from:getItemStorage():list(item)
   end
 

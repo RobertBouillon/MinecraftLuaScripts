@@ -169,7 +169,7 @@ function FluidStorage:count(fluid: Fluid | string | nil) : integer
     end
     return count
     --elseif fluid is Fluid | string then  -- hack: https://github.com/teal-language/tl/issues/742
-    elseif type(fluid) == "string" or type(fluid) == "table" then 
+    elseif fluid is string or fluid is Fluid then 
       for _,cursor in ipairs(self:list(fluid)) do
         count = count + cursor.amount
       end
@@ -215,7 +215,7 @@ function FluidStorage:pushAll(
   if fluid is nil then
     toMove = self:list()
   --elseif fluid is Fluid | string then -- hack: https://github.com/teal-language/tl/issues/742
-  elseif type(fluid) == "table" or type(fluid) == "string" then
+  elseif fluid is string or fluid is Fluid then 
     toMove = self:list(fluid)
   end
 
@@ -317,7 +317,7 @@ function FluidStorage:pullAll(
   if fluid is nil then
     toMove = _from:getFluidStorage():list()
   -- elseif fluid is Fluid | string then-- hack: https://github.com/teal-language/tl/issues/742
-  elseif type(fluid) == "string" or type(fluid) == "table" then
+  elseif fluid is string or fluid is Fluid then 
     toMove = _from:getFluidStorage():list(fluid)
   end
 
