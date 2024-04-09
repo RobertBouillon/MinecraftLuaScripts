@@ -4,8 +4,11 @@ require("tl/ccapi")
 
 
 
-
 FluidStorage = {TankContents = {}, }
+
+
+
+
 
 
 
@@ -165,7 +168,8 @@ function FluidStorage:count(fluid)
          count = count + x.amount
       end
       return count
-   elseif type(fluid) == "table" then
+
+   elseif type(fluid) == "string" or type(fluid) == "table" then
       for _, cursor in ipairs(self:list(fluid)) do
          count = count + cursor.amount
       end
@@ -191,7 +195,6 @@ function FluidStorage:push(   to,
 
    local found = self:find(fluid)
    if found then
-      print(peripheralName, count, fluidName)
       return self.peripheral.pushFluid(peripheralName, count, fluidName)
    else
       return 0
@@ -209,7 +212,8 @@ function FluidStorage:pushAll(   to,
 
    if fluid == nil then
       toMove = self:list()
-   elseif type(fluid) == "table" then
+
+   elseif type(fluid) == "table" or type(fluid) == "string" then
       toMove = self:list(fluid)
    end
 
@@ -226,23 +230,39 @@ function FluidStorage:pushAll(   to,
    return total
 end
 
-function FluidStorage:pushMax(   to,
+function FluidStorage:pushFill(   to,
    fluid,
-   max,
-   min)
+   min,
+   max)
 
-   local count
-   count = self:count(fluid)
+
+   local _to = FluidStorageWrapper.new(to)
+
+   local count = _to:getFluidStorage():count(fluid)
 
    if math.type(min) == "integer" then
-      if count < min then return 0 end
+      if count > min then return 0 end
    end
 
    if math.type(max) == "integer" then
       count = max - count
+      if count == 0 then return 0 end
    else
       count = nil
    end
+
+   return self:push(to, fluid, count)
+end
+
+
+function FluidStorage:pushWhen(   to,
+   fluid,
+   threshhold)
+
+   local count
+   count = self:count(fluid)
+
+   if count < threshhold then return 0 end
 
    return self:push(to, fluid, count)
 end
@@ -290,7 +310,8 @@ function FluidStorage:pullAll(   from,
 
    if fluid == nil then
       toMove = _from:getFluidStorage():list()
-   elseif type(fluid) == "table" then
+
+   elseif type(fluid) == "string" or type(fluid) == "table" then
       toMove = _from:getFluidStorage():list(fluid)
    end
 
@@ -305,10 +326,11 @@ function FluidStorage:pullAll(   from,
    return total
 end
 
-function FluidStorage:pullMax(   from,
+function FluidStorage:pullFill(   from,
    fluid,
-   max,
-   min)
+   min,
+   max)
+
 
    local peripheralName = FluidStorage.getPeripheralName(from)
 
@@ -321,8 +343,11 @@ function FluidStorage:pullMax(   from,
 
    if math.type(max) == "integer" then
       count = max - count
+      if count == 0 then return 0 end
    else
       count = nil
    end
+
+
    return self:pullAll(peripheralName, fluid, count)
 end

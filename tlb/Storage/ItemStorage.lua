@@ -91,6 +91,10 @@ ItemStorage = {SlotContents = {}, }
 
 
 
+
+
+
+
 function ItemStorage.new(peripheralName)
    local self = setmetatable({}, { __index = ItemStorage })
    self.peripheralName = peripheralName
@@ -195,7 +199,8 @@ function ItemStorage:count(item)
    elseif math.type(item) == "integer" then
       local contents = self:getItem(item)
       if contents == nil then return 0 else return contents.count end
-   elseif type(item) == "table" then
+
+   elseif type(item) == "table" or type("item") == "string" then
       for _, cursor in pairs(self:list(item)) do
          count = count + cursor.count
       end
@@ -211,7 +216,8 @@ function ItemStorage:countSlots(item)
          count = count + 1
       end
       return count
-   elseif type(item) == "table" then
+
+   elseif type(item) == "table" or type(item) == "string" then
       for _ in pairs(self:list(item)) do
          count = count + 1
       end
@@ -235,15 +241,15 @@ function ItemStorage:push(   to,
 
    local peripheralName = ItemStorage.getPeripheralName(to)
 
-   if type(item) == "table" then
+   if math.type(item) == "integer" then
+      return self.peripheral.pushItems(peripheralName, item, count, toSlot)
+   elseif type(item) == "string" or type(item) == "table" then
       local found, slot = self:find(item)
       if found then
          return self.peripheral.pushItems(peripheralName, slot, count, toSlot)
       else
          return 0
       end
-   elseif math.type(item) == "integer" then
-      return self.peripheral.pushItems(peripheralName, item, count, toSlot)
    end
 end
 
@@ -258,7 +264,8 @@ function ItemStorage:pushAll(   to,
 
    if item == nil then
       toMove = self:list()
-   elseif type(item) == "table" then
+
+   elseif type(item) == "string" or type(item) == "table" then
       toMove = self:list(item)
    end
 
@@ -275,11 +282,12 @@ function ItemStorage:pushAll(   to,
 end
 
 
-function ItemStorage:pushMax(   to,
+function ItemStorage:pushFill(   to,
    item,
-   max,
    toSlot,
-   min)
+   min,
+   max)
+
 
    local _to = ItemStorageWrapper.new(to)
 
@@ -293,16 +301,17 @@ function ItemStorage:pushMax(   to,
    end
 
    if math.type(min) == "integer" then
-      if count < min then return 0 end
+      if count > min then return 0 end
    end
 
    if math.type(max) == "integer" then
       count = max - count
+      if count == 0 then return 0 end
    else
       count = nil
    end
 
-   return self:pushAll(to, item, count, toSlot)
+   return self:push(to, item, count, toSlot)
 end
 
 function ItemStorage:pushSlots(   to,
@@ -315,7 +324,8 @@ function ItemStorage:pushSlots(   to,
    local toMove
    if item == nil then
       toMove = self:list()
-   elseif type(item) == "table" then
+
+   elseif type(item) == "string" or type(item) == "table" then
       toMove = self:list(item)
    end
 
@@ -337,15 +347,16 @@ function ItemStorage:pull(   from,
 
    local _from = ItemStorageWrapper.new(from)
 
-   if type(item) == "table" then
+   if math.type(item) == "integer" then
+      return self.peripheral.pullItems(_from.peripheralName, item, count, toSlot)
+
+   elseif type(item) == "string" or type(item) == "table" then
       local found, slot = _from:getItemStorage():find(item)
       if found then
          return self.peripheral.pullItems(_from.peripheralName, slot, count, toSlot)
       else
          return 0
       end
-   elseif math.type(item) == "integer" then
-      return self.peripheral.pullItems(_from.peripheralName, item, count, toSlot)
    end
 end
 
@@ -377,7 +388,15 @@ function ItemStorage:pullAll(   from,
 
    if item == nil then
       toMove = _from:getItemStorage():list()
-   elseif type(item) == "table" then
+   elseif math.type(item) == "integer" then
+      local slotContents = _from:getItemStorage():getItem(item)
+      if slotContents == nil then
+         return 0
+      else
+         toMove = { slotContents }
+      end
+
+   elseif type(item) == "table" or type(item) == "string" then
       toMove = _from:getItemStorage():list(item)
    end
 
@@ -392,11 +411,12 @@ function ItemStorage:pullAll(   from,
    return total
 end
 
-function ItemStorage:pullMax(   from,
+function ItemStorage:pullFill(   from,
    item,
-   max,
    toSlot,
-   min)
+   min,
+   max)
+
 
    local peripheralName = ItemStorage.getPeripheralName(from)
 
@@ -410,11 +430,12 @@ function ItemStorage:pullMax(   from,
    end
 
    if math.type(min) == "integer" then
-      if count < min then return 0 end
+      if count > min then return 0 end
    end
 
    if math.type(max) == "integer" then
       count = max - count
+      if count == 0 then return 0 end
    else
       count = nil
    end
@@ -433,7 +454,8 @@ function ItemStorage:pullSlots(   from,
 
    if item == nil then
       toMove = _from:getItemStorage():list()
-   elseif type(item) == "table" then
+
+   elseif type(item) == "string" or type(item) == "table" then
       toMove = _from:getItemStorage():list(item)
    end
 

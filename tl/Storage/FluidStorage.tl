@@ -2,7 +2,6 @@ require "tl/Factory/Item"
 require "tl/Storage/Common"
 require "tl/ccapi"
 
---Comments left in to illustrate differences with ItemStorage API
 --Big difference between this and ItemStorage is no concept of slot numbers in push/pull
 --HOWEVER you can still get slot numbers from list() for some reason
 global record FluidStorage
@@ -24,9 +23,8 @@ global record FluidStorage
   push: function (
     self: FluidStorage,
     to : FluidStorage | string, 
-    Fluid: Fluid | string,   --Fluid: Fluid | integer | string, 
+    Fluid: Fluid | string,   
     count: integer | nil
-    --toSlot: integer | nil
   ) : integer
     
   pushAll: function(
@@ -34,23 +32,28 @@ global record FluidStorage
     to : FluidStorage | string, 
     Fluid: Fluid | string | nil, 
     count: integer | nil
-    --toSlot: integer | nil
   ) : integer
 
-  pushMax: function(
+  pushFill: function(
     self: FluidStorage,
     to : FluidStorage | string, 
     fluid: Fluid | string, 
-    max: integer | nil,
-    --toSlot: integer | nil,
-    min: integer | nil) : integer
-
+    min: integer | nil,
+    max: integer | nil
+  ) : integer
+  
+  pushWhen: function(
+    self: FluidStorage,
+    to : FluidStorage | string, 
+    fluid: Fluid | string, 
+    threshold: integer
+  ) : integer
+  
   pull: function (
     self: FluidStorage,
     from : FluidStorage | string, 
-    fluid: Fluid | string,   --fluid: Fluid | integer | string,   --No concept of a "slot" with push / pull fluids
+    fluid: Fluid | string,
     count: integer | nil
-    --toSlot: integer | nil
   ) : integer
     
   pullAll: function(
@@ -61,15 +64,15 @@ global record FluidStorage
     --toSlot: integer | nil
   ) : integer
 
-  pullMax: function(
+  pullFill: function(
     self: FluidStorage,
     from : FluidStorage | string, 
     fluid: Fluid | string, 
-    max: integer | nil,
-    --toSlot: integer | nil,
-    min: integer | nil) : integer
-
-end
+    min: integer | nil,
+    max: integer | nil
+  ) : integer
+  
+  end
 
 function FluidStorage.new(peripheralName: string): FluidStorage
 local self: FluidStorage = setmetatable({}, { __index = FluidStorage })
@@ -165,12 +168,13 @@ function FluidStorage:count(fluid: Fluid | string | nil) : integer
       count = count + x.amount
     end
     return count
-  elseif fluid is Fluid | string then
-    for _,cursor in ipairs(self:list(fluid)) do
-      count = count + cursor.amount
+    --elseif fluid is Fluid | string then  -- hack: https://github.com/teal-language/tl/issues/742
+    elseif type(fluid) == "string" or type(fluid) == "table" then 
+      for _,cursor in ipairs(self:list(fluid)) do
+        count = count + cursor.amount
+      end
+      return count
     end
-    return count
-  end
 end
 
 function FluidStorage:find(fluid: Fluid | string) : boolean,integer | nil --Found,Count
@@ -192,7 +196,6 @@ function FluidStorage:push(
 
   local found = self:find(fluid)
   if found then
-    print(peripheralName,count,fluidName)
     return self.peripheral.pushFluid(peripheralName,count,fluidName)
   else
     return 0
@@ -211,7 +214,8 @@ function FluidStorage:pushAll(
 
   if fluid is nil then
     toMove = self:list()
-  elseif fluid is Fluid | string then
+  --elseif fluid is Fluid | string then -- hack: https://github.com/teal-language/tl/issues/742
+  elseif type(fluid) == "table" or type(fluid) == "string" then
     toMove = self:list(fluid)
   end
 
@@ -228,24 +232,41 @@ function FluidStorage:pushAll(
   return total
 end
 
-function FluidStorage:pushMax(
+function FluidStorage:pushFill(
   to : FluidStorage | string, 
   fluid: Fluid | string, 
-  max: integer | nil,
-  min: integer | nil) : integer
+  min: integer | nil,
+  max: integer | nil
+  ) : integer
 
-  local count : integer
-  count = self:count(fluid)
+  local _to = FluidStorageWrapper.new(to)
+
+  local count = _to:getFluidStorage():count(fluid)
 
   if min is integer then
-    if count < min then return 0 end
+    if count > min then return 0 end
   end
 
   if max is integer then
     count = max - count
+    if count == 0 then return 0 end
   else
     count = nil
   end
+
+  return self:push(to, fluid, count)
+end
+
+
+function FluidStorage:pushWhen(
+  to : FluidStorage | string, 
+  fluid: Fluid | string, 
+  threshhold: integer) : integer
+
+  local count : integer
+  count = self:count(fluid)
+
+  if count < threshhold then return 0 end
 
   return self:push(to, fluid, count)
 end
@@ -295,7 +316,8 @@ function FluidStorage:pullAll(
 
   if fluid is nil then
     toMove = _from:getFluidStorage():list()
-  elseif fluid is Fluid | string then
+  -- elseif fluid is Fluid | string then-- hack: https://github.com/teal-language/tl/issues/742
+  elseif type(fluid) == "string" or type(fluid) == "table" then
     toMove = _from:getFluidStorage():list(fluid)
   end
 
@@ -310,11 +332,12 @@ function FluidStorage:pullAll(
   return total
 end
 
-function FluidStorage:pullMax(
+function FluidStorage:pullFill(
   from : FluidStorage | string, 
   fluid: Fluid | string, 
-  max: integer | nil,
-  min: integer | nil) : integer
+  min: integer | nil,
+  max: integer | nil
+  ) : integer
 
   local peripheralName = FluidStorage.getPeripheralName(from)
 
@@ -327,8 +350,11 @@ function FluidStorage:pullMax(
 
   if max is integer then
     count = max - count
+    if count == 0 then return 0 end
   else
     count = nil
   end
+
+
   return self:pullAll(peripheralName, fluid, count)
 end

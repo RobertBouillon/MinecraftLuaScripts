@@ -1,6 +1,28 @@
-local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 then local p, m = pcall(require, 'compat53.module'); if p then _tl_compat = m end end; local ipairs = _tl_compat and _tl_compat.ipairs or ipairs; local math = _tl_compat and _tl_compat.math or math; local string = _tl_compat and _tl_compat.string or string; local table = _tl_compat and _tl_compat.table or table; require("tl/Factory/Item")
+local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 then local p, m = pcall(require, 'compat53.module'); if p then _tl_compat = m end end; local ipairs = _tl_compat and _tl_compat.ipairs or ipairs; local math = _tl_compat and _tl_compat.math or math; local os = _tl_compat and _tl_compat.os or os; local string = _tl_compat and _tl_compat.string or string; local table = _tl_compat and _tl_compat.table or table; require("tl/Factory/Item")
 require("tl/Storage")
 require("tl/Common")
+
+Delay = {}
+
+
+
+
+
+
+function Delay.new(interval)
+   local self = setmetatable({}, { __index = Delay })
+   self.interval = interval
+   return self
+end
+
+function Delay:canRun()
+   local last = self.last
+   if type(last) == "number" then
+      if os.clock() < last + self.interval then return false end
+   end
+   self.last = os.clock()
+   return true
+end
 
 MachineType = {}
 
@@ -33,6 +55,7 @@ function MachineType.parse(name)
 end
 
 Machine = {}
+
 
 
 
@@ -95,9 +118,9 @@ local function defaultWorker(machine, storage, itemsIn, itemsOut)
 
    for _, thing in ipairs(itemsIn) do
       if thing:is("Item") then
-         item:pushMax(machine.storage[1].item, thing, 32, nil, 16)
+         item:pushFill(machine.storage[1].item, thing, nil, 16, 32)
       elseif thing:is("Fluid") then
-         fluid:pushMax(machine.storage[1].fluid, thing, 4000, 2000)
+         fluid:pushFill(machine.storage[1].fluid, thing, 2000, 4000)
       end
    end
 end

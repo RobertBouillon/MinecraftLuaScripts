@@ -13,7 +13,7 @@ local Things = {
    Plastic = Item.new("industrialforegoing:plastic", "Plastic"),
    MenrilLog = Item.new("integrateddynamics:menril_log", "Menril Log"),
    MenrilSapling = Item.new("integrateddynamics:menril_sapling", "Menril Sapling"),
-   MenrilCrystal = Item.new("integrateddynamics:crystalized_menril_chunk", "Crystalized Menril Chunk"),
+   MenrilCrystal = Item.new("integrateddynamics:crystalized_menril_chunk", "Crystalized Menril"),
    SulfurDust = Item.new("mekanism:dust_sulfur", "Sulfur Dust"),
    Mushroom = Item.new("minecraft:red_mushroom", "Mushroom"),
    Potato = Item.new("minecraft:potato", "Potato"),
@@ -74,19 +74,30 @@ local CompositeMachines = {
 
 
 
-Machines.SporesRecreator.worker = function(machine, storage)
-
-   local m = machine.storage[1]
-   m.item:pushSlots(storage.item, nil, 6)
-   m.fluid:pullMax(storage.fluid, Things.Water, nil, 500)
-   m.item:pullMax(storage.item, Things.Mushroom, 64, 3, 32)
-end
-
-Machines.SporesRecreator.clearer = function(machine, storage)
+local ifclearer = function(machine, storage)
    local m = machine.storage[1]
    m.item:pushAll(storage.item)
    m.fluid:pushAll(storage.fluid)
 end
+
+Machines.LatexProcessingUnit.clearer = ifclearer
+Machines.LatexProcessingUnit.worker = function(machine, storage)
+
+   local m = machine.storage[1]
+   m.item:pushSlots(storage.item, nil, 3)
+   m.fluid:pullFill(storage.fluid, Things.Water, 500)
+   m.fluid:pullFill(storage.fluid, Things.Latex, 500)
+end
+
+Machines.SporesRecreator.clearer = ifclearer
+Machines.SporesRecreator.worker = function(machine, storage)
+
+   local m = machine.storage[1]
+   m.item:pushSlots(storage.item, nil, 6)
+   m.fluid:pullFill(storage.fluid, Things.Water, 500)
+   m.item:pullFill(storage.item, Things.Mushroom, 3, 32, 64)
+end
+
 
 Machines.PhytogenicInsolator.worker = function(machine, storage, itemsIn)
 
@@ -97,9 +108,9 @@ Machines.PhytogenicInsolator.worker = function(machine, storage, itemsIn)
 
    for _, thing in ipairs(itemsIn) do
       if thing:is("Item") then
-         item:pushMax(machine.storage[1].item, thing, 16, nil, 8)
+         item:pushFill(machine.storage[1].item, thing, 1, 8, 16)
       elseif thing:is("Fluid") then
-         fluid:pushMax(machine.storage[1].fluid, thing, nil, 8000)
+         fluid:pushFill(machine.storage[1].fluid, thing, nil, 8000)
       end
    end
 end
@@ -110,8 +121,8 @@ CompositeMachines.LatexMaker.worker = function(machine, storage)
    local extractor = machine.storage[2].fluid
    local s = storage
 
-   placer:pullMax(s.item, Things.OakLog, 1)
-   extractor:pushMax(s.fluid, Things.Latex, nil, 950)
+   placer:pullFill(s.item, Things.OakLog, nil, nil, 1)
+   extractor:pushWhen(s.fluid, Things.Latex, 950)
 end
 
 CompositeMachines.LatexMaker.clearer = function(machine, storage)
@@ -129,9 +140,13 @@ CompositeMachines.HotThermo.worker = function(machine, storage, itemsIn, itemsOu
    local burner = machine.storage[2]
    local s = storage
 
-   s.fluid:pushMax(burner.fluid, Things.Biodiesel, 1000, 100)
+   if machine.delay == nil then
+      machine.delay = Delay.new(60)
+   end
+   local delay = machine.delay
+   if not delay:canRun() then return end
 
-
+   s.fluid:pushFill(burner.fluid, Things.Biodiesel, 1000, 2000)
 
    for _, thing in ipairs(itemsIn) do
       if thing:is("Item") then
@@ -141,6 +156,7 @@ CompositeMachines.HotThermo.worker = function(machine, storage, itemsIn, itemsOu
       end
    end
 
+   s.fluid:pull(thermo.fluid)
    for _, thing in ipairs(itemsOut) do
       if thing:is("Item") then
          s.item:pull(thermo.item, 1)
@@ -163,6 +179,8 @@ end
 
 
 local Recipes = {
+   Recipe.new(Things.MenrilCrystal, Machines.MechanicalSqueezer, Things.MenrilLog),
+   Recipe.new(Things.MenrilResin, Machines.MagmaCrucible, Things.MenrilCrystal),
    Recipe.new(Things.Mushroom, Machines.SporesRecreator, Things.Mushroom, Things.Water),
    Recipe.new(Things.Potato, Machines.PhytogenicInsolator, Things.Potato, Things.Water),
    Recipe.new(Things.OakLog, Machines.PhytogenicInsolator, Things.OakSapling, Things.Water),
@@ -184,13 +202,13 @@ local Recipes = {
    Recipe.new(Things.Plastic, Machines.RedstoneFurnace, Things.DryRubber),
    Recipe.new(Things.LDPE, Machines.FluidEncapsulator, Things.Plastic, Things.Polyethylene),
    Recipe.new(Things.MoltenSilver, Machines.MagmaCrucible, Things.SilverIngot),
-   Recipe.new(Things.MenrilResin, Machines.MagmaCrucible, Things.MenrilCrystal),
-   Recipe.new(Things.MenrilCrystal, Machines.MechanicalSqueezer, Things.MenrilLog),
    Recipe.new(Things.LiquidForce, Machines.Pyrolyzer, Things.ForcePlanks),
 
    Recipe.new(Things.Latex, CompositeMachines.LatexMaker, Things.OakLog, Things.Water),
    Recipe.new(Things.Quicksilver, CompositeMachines.HotThermo, Things.Cinnabar, Things.MenrilResin),
 }
+
+Recipes[1].itemsOut = { Things.MenrilCrystal, Things.MenrilResin }
 
 return {
    recipes = Recipes,
@@ -209,6 +227,7 @@ return {
       Machines.RedstoneFurnace,
       Machines.MagmaCrucible,
       Machines.Pyrolyzer,
+      Machines.Crafter3,
    },
    craftable = {
       Mushroom = Things.Mushroom,

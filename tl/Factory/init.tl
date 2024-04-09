@@ -137,7 +137,7 @@ function Factory:startMaking(thing : Thing) : boolean
     else
       local machineType = recipe.machineType
       if not self:assign(thing, machineType) then
-        self.runlog[thing] = "No " .. machineType.name .. " available"
+        self.runlog[thing] = "No " .. machineType.name
         return false
       end
     end

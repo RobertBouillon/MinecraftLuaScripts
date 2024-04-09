@@ -2,6 +2,28 @@ require "tl/Factory/Item"
 require "tl/Storage"
 require "tl/Common"
 
+global record Delay
+  new: function(interval : number) : Delay
+  interval : number
+  last : number | nil
+
+  canRun: function(self:Delay) : boolean
+end
+function Delay.new(interval : number) : Delay
+  local self: Delay = setmetatable({},{__index = Delay})
+  self.interval = interval
+  return self
+end
+
+function Delay:canRun() : boolean
+  local last = self.last
+  if last is number then
+    if os.clock() < last + self.interval then return false end
+  end
+  self.last = os.clock()
+  return true
+end
+
 global record MachineType
   type machineWorker = function(machine : Machine, storage : Storage, itemsIn : {Thing}, itemsOut: {Thing})
   type machineClearer = function(machine : Machine, storage : Storage)
@@ -38,6 +60,7 @@ global record Machine
   type: MachineType
   peripherals : {string}
   storage : {Storage}
+  delay : Delay | nil
   work: function(self:Machine, storage : Storage, itemsIn : {Thing}, itemsOut: {Thing})
   clear: function(self:Machine, storage : Storage)
 end
@@ -86,7 +109,7 @@ local function defaultWorker(machine:Machine, storage : Storage, itemsIn:{Thing}
   local fluid = storage.fluid as FluidStorage
 
   for _,thing in ipairs(itemsOut) do
-      if thing:is("Item") then
+    if thing:is("Item") then
       item:pullAll(machine.storage[1].item, thing as Item)
     elseif thing:is("Fluid") then
       fluid:pullAll(machine.storage[1].fluid, thing as Fluid)
@@ -95,9 +118,9 @@ local function defaultWorker(machine:Machine, storage : Storage, itemsIn:{Thing}
 
   for _,thing in ipairs(itemsIn) do
     if thing:is("Item") then
-      item:pushMax(machine.storage[1].item, thing as Item, 32, nil, 16)
+      item:pushFill(machine.storage[1].item, thing as Item, nil, 16, 32)
     elseif thing:is("Fluid") then
-      fluid:pushMax(machine.storage[1].fluid, thing as Fluid, 4000, 2000)
+      fluid:pushFill(machine.storage[1].fluid, thing as Fluid, 2000, 4000)
     end
   end
 end

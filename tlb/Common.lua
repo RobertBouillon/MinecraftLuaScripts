@@ -1,4 +1,4 @@
-local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 then local p, m = pcall(require, 'compat53.module'); if p then _tl_compat = m end end; local debug = _tl_compat and _tl_compat.debug or debug; local ipairs = _tl_compat and _tl_compat.ipairs or ipairs; function tableContains(source, element)
+local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 then local p, m = pcall(require, 'compat53.module'); if p then _tl_compat = m end end; local debug = _tl_compat and _tl_compat.debug or debug; local ipairs = _tl_compat and _tl_compat.ipairs or ipairs; local math = _tl_compat and _tl_compat.math or math; function tableContains(source, element)
    for _, value in ipairs(source) do
       if value == element then
          return true
@@ -23,4 +23,24 @@ function traceStack()
       i = i + 1
    end
    print("---")
+end
+
+Range = {}
+
+
+
+
+
+
+function Range:within(value)
+   local min = self.min
+   local max = self.max
+
+   if math.type(min) == "integer" then
+      if value < min then return false end
+   end
+   if math.type(max) == "integer" then
+      if value > max then return false end
+   end
+   return true
 end

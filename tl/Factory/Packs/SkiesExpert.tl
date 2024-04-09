@@ -13,8 +13,8 @@ local Things = {
   Plastic       = Item.new("industrialforegoing:plastic",          "Plastic"        ) as Thing,
   MenrilLog     = Item.new("integrateddynamics:menril_log",        "Menril Log"     ) as Thing,
   MenrilSapling = Item.new("integrateddynamics:menril_sapling",    "Menril Sapling" ) as Thing,
-  MenrilCrystal = Item.new("integrateddynamics:crystalized_menril_chunk", "Crystalized Menril Chunk"  ) as Thing,
-  SulfurDust    = Item.new("mekanism:dust_sulfur",                 "Sulfur Dust"                      ) as Thing,
+  MenrilCrystal = Item.new("integrateddynamics:crystalized_menril_chunk", "Crystalized Menril"  ) as Thing,
+  SulfurDust    = Item.new("mekanism:dust_sulfur",                 "Sulfur Dust"                ) as Thing,
   Mushroom      = Item.new("minecraft:red_mushroom",               "Mushroom"       ) as Thing,
   Potato        = Item.new("minecraft:potato",                     "Potato"         ) as Thing,
   OakSapling		= Item.new("minecraft:oak_sapling",                "Oak Sapling"    ) as Thing,
@@ -74,19 +74,30 @@ local CompositeMachines = {
 
 
 --- Machine Customization
-Machines.SporesRecreator.worker  = function (machine:Machine, storage : Storage)
-  --REASON: Spores Recreator API only works locally and doesn't allow it to be targeted by push / pull commands
-  local m = machine.storage[1] as HardStorage
-  m.item:pushSlots(storage.item, nil as Item, 6)                  --Empty output
-  m.fluid:pullMax(storage.fluid, Things.Water as Fluid,nil,500)   --Fill with water
-  m.item:pullMax(storage.item, Things.Mushroom as Item,64,3,32)   --Fill with Mushrooms
-end
-
-Machines.SporesRecreator.clearer  = function (machine:Machine, storage : Storage)
+local ifclearer  = function (machine:Machine, storage : Storage)
   local m = machine.storage[1] as HardStorage
   m.item:pushAll(storage.item)
   m.fluid:pushAll(storage.fluid)
 end
+
+Machines.LatexProcessingUnit.clearer  = ifclearer
+Machines.LatexProcessingUnit.worker = function (machine:Machine, storage : Storage)
+  --REASON: Spores Recreator API only works locally and doesn't allow it to be targeted by push / pull commands
+  local m = machine.storage[1] as HardStorage
+  m.item:pushSlots(storage.item, nil as Item, 3)                  --Empty output
+  m.fluid:pullFill(storage.fluid, Things.Water as Fluid,500)      --Fill with water
+  m.fluid:pullFill(storage.fluid, Things.Latex as Fluid,500)      --Fill with Latex
+end
+
+Machines.SporesRecreator.clearer  = ifclearer
+Machines.SporesRecreator.worker  = function (machine:Machine, storage : Storage)
+  --REASON: Spores Recreator API only works locally and doesn't allow it to be targeted by push / pull commands
+  local m = machine.storage[1] as HardStorage
+  m.item:pushSlots(storage.item, nil as Item, 6)                  --Empty output
+  m.fluid:pullFill(storage.fluid, Things.Water as Fluid,500)      --Fill with water
+  m.item:pullFill(storage.item, Things.Mushroom as Item,3,32,64)  --Fill with Mushrooms
+end
+
 
 Machines.PhytogenicInsolator.worker = function(machine:Machine, storage : Storage, itemsIn : {Thing})
   -- REASON: We only want to pull from slot 3+
@@ -97,9 +108,9 @@ Machines.PhytogenicInsolator.worker = function(machine:Machine, storage : Storag
 
   for _,thing in ipairs(itemsIn) do
     if thing:is("Item") then
-      item:pushMax(machine.storage[1].item, thing as Item, 16, nil, 8)
+      item:pushFill(machine.storage[1].item, thing as Item, 1, 8, 16)
     elseif thing:is("Fluid") then
-      fluid:pushMax(machine.storage[1].fluid, thing as Fluid, nil, 8000)
+      fluid:pushFill(machine.storage[1].fluid, thing as Fluid, nil, 8000)
     end
   end
 end
@@ -110,8 +121,8 @@ CompositeMachines.LatexMaker.worker = function (machine:Machine, storage : Stora
   local extractor = machine.storage[2].fluid as FluidStorage
   local s = storage as HardStorage
 
-  placer:pullMax(s.item, Things.OakLog as Item, 1)
-  extractor:pushMax(s.fluid, Things.Latex as Fluid, nil, 950)
+  placer:pullFill(s.item, Things.OakLog as Item, nil, nil, 1)
+  extractor:pushWhen(s.fluid, Things.Latex as Fluid, 950)
 end
 
 CompositeMachines.LatexMaker.clearer = function (machine : Machine, storage : Storage)
@@ -129,9 +140,13 @@ CompositeMachines.HotThermo.worker = function (machine:Machine, storage : Storag
   local burner = machine.storage[2]
   local s = storage as HardStorage
 
-  s.fluid:pushMax(burner.fluid, Things.Biodiesel as Fluid, 1000, 100)
+  if machine.delay == nil then
+    machine.delay = Delay.new(60) --These machines are SLOW, and without an API, we would pull and push too often
+  end
+  local delay = machine.delay as Delay
+  if not delay:canRun() then return end
 
-  --TODO: This is blind so we shouldn't do this every tick. Delay this a few seconds.
+  s.fluid:pushFill(burner.fluid, Things.Biodiesel as Fluid, 1000, 2000)
 
   for _,thing in ipairs(itemsIn) do
     if thing:is("Item") then
@@ -141,6 +156,7 @@ CompositeMachines.HotThermo.worker = function (machine:Machine, storage : Storag
     end
   end
 
+  s.fluid:pull(thermo.fluid)
   for _,thing in ipairs(itemsOut) do
     if thing:is("Item") then 
       s.item:pull(thermo.item, 1)
@@ -163,6 +179,8 @@ end
 
 
 local Recipes : { Recipe } = {
+  Recipe.new(Things.MenrilCrystal,Machines.MechanicalSqueezer,   Things.MenrilLog),
+  Recipe.new(Things.MenrilResin,  Machines.MagmaCrucible,        Things.MenrilCrystal),
   Recipe.new(Things.Mushroom,     Machines.SporesRecreator,      Things.Mushroom, Things.Water),
   Recipe.new(Things.Potato,       Machines.PhytogenicInsolator,  Things.Potato, Things.Water),
   Recipe.new(Things.OakLog,       Machines.PhytogenicInsolator,  Things.OakSapling, Things.Water),
@@ -184,13 +202,13 @@ local Recipes : { Recipe } = {
   Recipe.new(Things.Plastic,      Machines.RedstoneFurnace,      Things.DryRubber),
   Recipe.new(Things.LDPE,         Machines.FluidEncapsulator,    Things.Plastic, Things.Polyethylene),
   Recipe.new(Things.MoltenSilver, Machines.MagmaCrucible,        Things.SilverIngot),
-  Recipe.new(Things.MenrilResin,  Machines.MagmaCrucible,        Things.MenrilCrystal),
-  Recipe.new(Things.MenrilCrystal,Machines.MechanicalSqueezer,   Things.MenrilLog),
   Recipe.new(Things.LiquidForce,  Machines.Pyrolyzer,            Things.ForcePlanks),
 
   Recipe.new(Things.Latex,        CompositeMachines.LatexMaker,  Things.OakLog, Things.Water),
   Recipe.new(Things.Quicksilver,  CompositeMachines.HotThermo,   Things.Cinnabar, Things.MenrilResin),
 }
+
+Recipes[1].itemsOut = {Things.MenrilCrystal, Things.MenrilResin}
 
 return {
   recipes = Recipes,
@@ -209,6 +227,7 @@ return {
     Machines.RedstoneFurnace       ,
     Machines.MagmaCrucible         ,
     Machines.Pyrolyzer             ,
+    Machines.Crafter3              ,
   },
   craftable = {
     Mushroom =    Things.Mushroom,

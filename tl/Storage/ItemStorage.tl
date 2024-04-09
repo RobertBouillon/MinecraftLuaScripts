@@ -42,20 +42,22 @@ global record ItemStorage
     toSlot: integer | nil
   ) : integer
 
-  pushMax: function(
+  pushFill: function(
     self: ItemStorage,
     to : ItemStorage | string, 
     item: Item | string, 
-    max: integer | nil,
     toSlot: integer | nil,
-    min: integer | nil) : integer
+    min: integer | nil,
+    max: integer | nil
+  ) : integer
 
   pushSlots: function (
     self: ItemStorage,
     to : ItemStorage | string, 
     item: Item | string | nil, 
     startingSlot: integer,
-    toSlot: integer | nil) : integer
+    toSlot: integer | nil
+  ) : integer
 
   pull: function (
     self: ItemStorage,
@@ -73,20 +75,22 @@ global record ItemStorage
     toSlot: integer | nil
   ) : integer
 
-  pullMax: function(
+  pullFill: function(
     self: ItemStorage,
     from : ItemStorage | string, 
     item: Item | string, 
-    max: integer | nil,
     toSlot: integer | nil,
-    min: integer | nil) : integer
+    min: integer | nil,
+    max: integer | nil
+  ) : integer
 
   pullSlots: function (
     self: ItemStorage,
     from : ItemStorage | string, 
     item: Item | string | nil, 
     startingSlot: integer,
-    toSlot: integer | nil) : integer
+    toSlot: integer | nil
+  ) : integer
 
 end
 
@@ -195,7 +199,8 @@ function ItemStorage:count(item: Item | string | integer | nil) : integer
   elseif item is integer then
     local contents = self:getItem(item)
     if contents == nil then return 0 else return contents.count end
-  elseif item is Item | string then
+  -- elseif item is Item | string then-- hack: https://github.com/teal-language/tl/issues/742
+    elseif type(item) == "table" or type("item") == "string" then
     for _,cursor in pairs(self:list(item)) do
       count = count + cursor.count
     end
@@ -211,11 +216,12 @@ function ItemStorage:countSlots(item: Item | string | nil) : integer
       count = count + 1
     end
     return count
-  elseif item is Item | string then
-    for _ in pairs(self:list(item)) do
-      count = count + 1
-    end
-    return count
+  -- elseif item is Item | string then -- hack: https://github.com/teal-language/tl/issues/742
+    elseif type(item) == "table" or type(item) == "string" then
+      for _ in pairs(self:list(item)) do
+        count = count + 1
+      end
+      return count
   end
 end
 
@@ -235,16 +241,16 @@ function ItemStorage:push(
   toSlot: integer | nil) : integer
 
   local peripheralName = ItemStorage.getPeripheralName(to)
-
-  if item is Item | string then
+  --if item is string | Item then  -- hack: https://github.com/teal-language/tl/issues/742
+  if item is integer then
+    return self.peripheral.pushItems(peripheralName,item,count,toSlot)
+  elseif type(item) == "string" or type(item) == "table" then
     local found,slot = self:find(item)
     if found then
       return self.peripheral.pushItems(peripheralName,slot,count,toSlot)
     else
       return 0
     end
-  elseif item is integer then
-    return self.peripheral.pushItems(peripheralName,item,count,toSlot)
   end
 end
 
@@ -260,7 +266,8 @@ function ItemStorage:pushAll(
 
   if item is nil then
     toMove = self:list()
-  elseif item is Item | string then
+--elseif item is Item | string then -- hack: https://github.com/teal-language/tl/issues/742
+  elseif type(item) == "string" or type(item) == "table" then
     toMove = self:list(item)
   end
 
@@ -277,12 +284,13 @@ function ItemStorage:pushAll(
 end
 
 --Pushes up to a max amount when a min amount is reached.
-function ItemStorage:pushMax(
+function ItemStorage:pushFill(
   to : ItemStorage | string, 
   item: Item | string, 
-  max: integer | nil,
   toSlot: integer | nil,
-  min: integer | nil) : integer
+  min: integer | nil,
+  max: integer | nil
+  ) : integer
 
   local _to = ItemStorageWrapper.new(to)
 
@@ -296,16 +304,17 @@ function ItemStorage:pushMax(
   end
 
   if min is integer then
-    if count < min then return 0 end
+    if count > min then return 0 end
   end
 
   if max is integer then
     count = max - count
+    if count == 0 then return 0 end
   else
     count = nil
   end
 
-  return self:pushAll(to, item, count, toSlot)
+  return self:push(to, item, count, toSlot)
 end
 
 function ItemStorage:pushSlots(
@@ -319,7 +328,8 @@ function ItemStorage:pushSlots(
   local toMove : { integer : ItemStorage.SlotContents }
   if item is nil then
     toMove = self:list()
-  elseif item is Item | string then
+  --elseif item is Item | string then  -- hack: https://github.com/teal-language/tl/issues/742
+  elseif type(item) == "string" or type(item) == "table" then
     toMove = self:list(item)
   end
 
@@ -342,15 +352,16 @@ function ItemStorage:pull(
 
   local _from = ItemStorageWrapper.new(from)
 
-  if item is Item | string then
+  if item is integer then
+    return self.peripheral.pullItems(_from.peripheralName,item,count,toSlot)
+  --elseif item is Item | string then  -- hack: https://github.com/teal-language/tl/issues/742
+  elseif type(item) == "string" or type(item) == "table" then
     local found,slot = _from:getItemStorage():find(item)
     if found then
       return self.peripheral.pullItems(_from.peripheralName,slot,count,toSlot)
     else
       return 0
     end
-  elseif item is integer then
-    return self.peripheral.pullItems(_from.peripheralName,item,count,toSlot)
   end
 end
 
@@ -383,7 +394,15 @@ function ItemStorage:pullAll(
 
   if item is nil then
     toMove = _from:getItemStorage():list()
-  elseif item is Item | string then
+  elseif item is integer then
+    local slotContents = _from:getItemStorage():getItem(item)
+    if slotContents == nil then
+      return 0
+    else
+      toMove = {slotContents}
+    end
+  --elseif item is Item | string then  -- hack: https://github.com/teal-language/tl/issues/742
+  elseif type(item) == "table" or type(item) == "string" then
     toMove = _from:getItemStorage():list(item)
   end
 
@@ -398,12 +417,13 @@ function ItemStorage:pullAll(
   return total
 end
 
-function ItemStorage:pullMax(
+function ItemStorage:pullFill(
   from : ItemStorage | string, 
   item: Item | string, 
-  max: integer | nil,
   toSlot: integer | nil,
-  min: integer | nil) : integer
+  min: integer | nil,
+  max: integer | nil
+  ) : integer
 
   local peripheralName = ItemStorage.getPeripheralName(from)
 
@@ -417,11 +437,12 @@ function ItemStorage:pullMax(
   end
 
   if min is integer then
-    if count < min then return 0 end
+    if count > min then return 0 end
   end
 
   if max is integer then
     count = max - count
+    if count == 0 then return 0 end
   else
     count = nil
   end
@@ -441,7 +462,8 @@ function ItemStorage:pullSlots(
 
   if item is nil then
     toMove = _from:getItemStorage():list()
-  elseif item is Item | string then
+  --elseif item is Item | string then   -- hack: https://github.com/teal-language/tl/issues/742
+  elseif type(item) == "string" or type(item) == "table" then
     toMove = _from:getItemStorage():list(item)
   end
 
