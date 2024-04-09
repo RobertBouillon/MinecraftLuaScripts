@@ -19,16 +19,39 @@ function fluids.wrap(name)
 		end
 	end
 	
+	function tank.count(fluid)
+		for _,f in pairs(tank.list()) do
+			if fluid == f.name then return f.amount end
+		end
+    return 0
+	end
+
+	function tank.find(fluid)
+		for slot,cursor in pairs(tank.list()) do
+			if cursor.name == fluid then return true, slot, cursor.amount end
+		end
+		return false
+	end
+
+	
 	function tank.push(to,fluid,amount)
 		if to.name ~= nil then to = to.name end
 		local moved = wrapper.pushFluid(to,amount,fluid)
-		return moved == amount, amount
+		return moved == amount, moved
+	end
+	
+	function tank.pushMax(to,fluid,amount)
+		if to.name ~= nil then to = to.name end
+    local amount = amount - fluids.wrap(to).count(fluid)
+    if amount <= 0 then return 0,0 end
+		local moved = wrapper.pushFluid(to,amount,fluid)
+		return moved == amount, moved
 	end
 	
 	function tank.pull(from,fluid,amount)
 		if from.name ~= nil then from = from.name end
 		local moved = wrapper.pullFluid(from,amount,fluid)
-		return moved == amount, amount
+		return moved == amount, moved
 	end
 	return tank
 end

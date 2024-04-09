@@ -51,6 +51,8 @@ download("UfndbHaX", "quarry")
 download("xzvapSjN", "passage")
 download("mseF1Kbc", "farm")
 download("T1p86Kg3", "storage")
+download("hn9wpSN1", "harvest")
+download("WVVD4F6f", "placer")
 
 makePassthru("get")
 makePassthru("containers")

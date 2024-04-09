@@ -22,8 +22,8 @@ end
 local function extend(_count, _size, _detail, _list)
 	local base = {}
 
-	function base.list()
-		return _list()
+  function base.list()
+    return _list()
 	end
 	
 	function base.size()
@@ -39,7 +39,7 @@ local function extend(_count, _size, _detail, _list)
 	end
 	
 	function base.counts()
-		counts = {}
+		local counts = {}
 		for slot,item in pairs(_list()) do
 			if item ~= nil then
 				local count = counts[item.name]
@@ -104,49 +104,86 @@ function inventory.wrap(side)
 	)
 	
 	chest.name = side
-	
+  chest.peripheral = __wrapper
+
+  function chest.pushMax(to, item, max, toSlot)
+    local count
+    if type(to) == "string" then
+      if not inventory.isInventory() then error("'" .. to .."' is not an inventory") end
+      count = max - inventory.wrap(to).count(item)
+    else
+      count = max - to.count(item)
+    end
+    chest.push(to,item,count,toSlot)
+  end
+
 	--Moves an item from this inventory to another.
 	--[item | slot] = item can be item name or slot
 	--returns: 
 	--  Boolean - Entire stack moved and slot is now empty
 	--  Number  - Number of items in stack moved
 	function chest.push(to, item, count, toSlot)
-		if type(to) ~= "string" then to = to.name end
-		
-		if type(item) == "number" then 
+		if type(to) ~= "string" and type(to.name) == "string" then to = to.name end
+
+		if type(item) == "number" then
 			--push to slot
 			if(count == nil) then count = chest.count(item) end
 			local moved = __wrapper.pushItems(to,item,count,toSlot)
-			return count == moved,total
+			return count == moved,moved
 		end
-		
+
+    if item ~= nil and toSlot == nil and chest.isInventory(to) then
+      local found,slot = inventory.wrap(to).find(item)
+      if found then toSlot = slot end
+    end
+
+    if item == nil then
+			--push all
+      for slot,item in pairs(chest.list()) do
+        __wrapper.pushItems(to,slot,item.count,toSlot)
+      end
+		end
+
 		local counted =  chest.count(item)
 		if count == nil then count = counted end
-		
+
 		local total = 0
-		repeat 
+		repeat
 			local found, slot, stack = chest.find(item)
-			if(not found) then return false, total end
+			if not found then return total > 0, total end
 			if stack > count - total then stack = count - total end
-			total = total + __wrapper.pushItems(to,slot,stack,toSlot)
+      local moved = __wrapper.pushItems(to,slot,stack,toSlot)
+      if moved > 0 then
+			  total = total + moved
+      else
+        break
+      end
 		until count == total
 		return true, total
 	end
 	
 	function chest.pull(from,item,count,toSlot)
-		if type(from) == "string" then from = inventory.wrap(from) end
 		return from.push(chest,item,count,toSlot)
 	end
 	
 	--Turtle can't interact directly with chests in this way in CC:Tweaked. Modem required.
 	--https://github.com/cc-tweaked/CC-Tweaked/discussions/601
 	function chest.put(item, count, toSlot)
-		error("Not Supported") 
+		error("Not Supported")
 	end
 
 	function chest.get(item, count)
 		error("Not implemented")
 	end
+
+  function chest.isInventory(name)
+    local types = {peripheral.getType(name)}
+    for _,t in pairs(types) do
+      if t == "inventory" then return true end
+    end
+    return false
+  end
+  
 	
 	return chest
 end
@@ -154,7 +191,7 @@ end
 if turtle == nil then return inventory end
 
 local function tlist()
-	list={}
+	local list={}
 	for s=1,16 do
 		local count = turtle.getItemCount(s)
 		if count > 0 then 
