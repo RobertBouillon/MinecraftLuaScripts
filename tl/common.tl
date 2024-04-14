@@ -44,3 +44,18 @@ function Range:within(value : integer) : boolean
   end
   return true
 end
+
+global function pairsByKeys<TKey,TValue>(t : {TKey : TValue}, compare : function(t1 : TKey, t2 : TKey) : boolean) : function() : TKey, TValue
+  local a : {TKey} = {} 
+  for n in pairs(t) do table.insert(a, n) end
+  table.sort(a, compare)
+  local i = 0
+  local iter = function () : TKey, TValue
+    i = i + 1
+    --if a[i] == nil then return nil
+    --else return a[i], t[a[i]]
+    --end
+    return a[i], t[a[i]]
+  end
+  return iter
+end

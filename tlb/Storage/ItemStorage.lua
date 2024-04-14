@@ -95,6 +95,10 @@ ItemStorage = {SlotContents = {}, }
 
 
 
+
+
+
+
 function ItemStorage.new(peripheralName)
    local self = setmetatable({}, { __index = ItemStorage })
    self.peripheralName = peripheralName
@@ -117,7 +121,7 @@ local ItemStorageWrapper = {}
 
 
 function ItemStorage:list(filter)
-   local list = self.peripheral.list()
+   local list = self.cachedList or self.peripheral.list()
    if filter == nil then return list end
    local id
    if type(filter) == "string" then id = filter
@@ -130,6 +134,14 @@ function ItemStorage:list(filter)
       end
    end
    return filtered
+end
+
+function ItemStorage:cacheList()
+   self.cachedList = self.peripheral.list()
+end
+
+function ItemStorage:clearCache()
+   self.cachedList = nil
 end
 
 function ItemStorage:size()
@@ -200,7 +212,7 @@ function ItemStorage:count(item)
       local contents = self:getItem(item)
       if contents == nil then return 0 else return contents.count end
 
-   elseif type(item) == "table" or type("item") == "string" then
+   elseif type(item) == "table" or type(item) == "string" then
       for _, cursor in pairs(self:list(item)) do
          count = count + cursor.count
       end
@@ -243,7 +255,7 @@ function ItemStorage:push(   to,
 
    if math.type(item) == "integer" then
       return self.peripheral.pushItems(peripheralName, item, count, toSlot)
-   elseif type(item) == "string" or type(item) == "table" then
+   elseif type(item) == "table" or type(item) == "string" then
       local found, slot = self:find(item)
       if found then
          return self.peripheral.pushItems(peripheralName, slot, count, toSlot)
@@ -265,7 +277,7 @@ function ItemStorage:pushAll(   to,
    if item == nil then
       toMove = self:list()
 
-   elseif type(item) == "string" or type(item) == "table" then
+   elseif type(item) == "table" or type(item) == "string" then
       toMove = self:list(item)
    end
 
@@ -325,7 +337,7 @@ function ItemStorage:pushSlots(   to,
    if item == nil then
       toMove = self:list()
 
-   elseif type(item) == "string" or type(item) == "table" then
+   elseif type(item) == "table" or type(item) == "string" then
       toMove = self:list(item)
    end
 
@@ -350,7 +362,7 @@ function ItemStorage:pull(   from,
    if math.type(item) == "integer" then
       return self.peripheral.pullItems(_from.peripheralName, item, count, toSlot)
 
-   elseif type(item) == "string" or type(item) == "table" then
+   elseif type(item) == "table" or type(item) == "string" then
       local found, slot = _from:getItemStorage():find(item)
       if found then
          return self.peripheral.pullItems(_from.peripheralName, slot, count, toSlot)
@@ -455,7 +467,7 @@ function ItemStorage:pullSlots(   from,
    if item == nil then
       toMove = _from:getItemStorage():list()
 
-   elseif type(item) == "string" or type(item) == "table" then
+   elseif type(item) == "table" or type(item) == "string" then
       toMove = _from:getItemStorage():list(item)
    end
 

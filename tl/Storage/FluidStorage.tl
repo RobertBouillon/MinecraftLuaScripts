@@ -1,6 +1,7 @@
 require "tl/Factory/Item"
 require "tl/Storage/Common"
 require "tl/ccapi"
+require "tl/common"
 
 --Big difference between this and ItemStorage is no concept of slot numbers in push/pull
 --HOWEVER you can still get slot numbers from list() for some reason
@@ -322,12 +323,17 @@ function FluidStorage:pullAll(
   end
 
   for _,slot in pairs(toMove) do
-    local moved = total + self.peripheral.pullFluid(_from.peripheralName,count,slot.name)
-    if count is integer then
-      count = count - moved
-      if count <= 0 then break end
+    local moved = 0
+    while moved < slot.amount do
+      local m = self.peripheral.pullFluid(_from.peripheralName,count,slot.name)
+      if m == 0 then break end
+      moved = moved + m
+      total = total + moved
+      if count is integer then
+        count = count - moved
+        if count <= 0 then break end
+      end
     end
-    total = total + moved
   end
   return total
 end
@@ -356,5 +362,5 @@ function FluidStorage:pullFill(
   end
 
 
-  return self:pullAll(peripheralName, fluid, count)
+  return self:pull(peripheralName, fluid, count)
 end

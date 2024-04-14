@@ -110,7 +110,8 @@ function Factory:renderUI()
    print()
 
    local lines = 0
-   for item, message in pairs(self.runlog) do
+   local function comp(t1, t2) return t1.name < t2.name end
+   for item, message in pairsByKeys(self.runlog, comp) do
       print(string.format("%-20s", item.name) .. message)
       lines = lines + 1
    end

@@ -20,6 +20,7 @@ tl gen $tl\Factory\Packs\SkiesExpert.tl -o $tlb\Factory\Packs\SkiesExpert.lua
 
 tl gen $tl\Common.tl -o $tlb\Common.lua
 tl gen $tl\debugger.tl -o $tlb\debugger.lua
+tl gen $tl\ps.tl -o $tlb\ps.lua
 
 
 $test = "C:\Users\Robert\AppData\Local\.ftba\instances\7a26f83e-7353-4fb4-bc5d-637896dc4bbb\saves\Test\computercraft\computer\9\tl"
@@ -28,3 +29,4 @@ Copy-Item $tlb\Factory $test -Recurse -Force
 Copy-Item $tlb\Storage $test -Recurse -Force
 Copy-Item $tlb\Common.lua $test -Force
 Copy-Item $tlb\Debugger.lua $test -Force
+Copy-Item $tlb\ps.lua $test -Force

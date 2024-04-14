@@ -118,7 +118,7 @@ local function defaultWorker(machine:Machine, storage : Storage, itemsIn:{Thing}
 
   for _,thing in ipairs(itemsIn) do
     if thing:is("Item") then
-      item:pushFill(machine.storage[1].item, thing as Item, nil, 16, 32)
+      item:pushFill(machine.storage[1].item, thing as Item, nil, 26, 32)
     elseif thing:is("Fluid") then
       fluid:pushFill(machine.storage[1].fluid, thing as Fluid, 2000, 4000)
     end

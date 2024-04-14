@@ -1,6 +1,7 @@
 local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 then local p, m = pcall(require, 'compat53.module'); if p then _tl_compat = m end end; local ipairs = _tl_compat and _tl_compat.ipairs or ipairs; local math = _tl_compat and _tl_compat.math or math; local pairs = _tl_compat and _tl_compat.pairs or pairs; local table = _tl_compat and _tl_compat.table or table; require("tl/Factory/Item")
 require("tl/Storage/Common")
 require("tl/ccapi")
+require("tl/common")
 
 
 
@@ -213,7 +214,7 @@ function FluidStorage:pushAll(   to,
    if fluid == nil then
       toMove = self:list()
 
-   elseif type(fluid) == "table" or type(fluid) == "string" then
+   elseif type(fluid) == "string" or type(fluid) == "table" then
       toMove = self:list(fluid)
    end
 
@@ -316,12 +317,17 @@ function FluidStorage:pullAll(   from,
    end
 
    for _, slot in pairs(toMove) do
-      local moved = total + self.peripheral.pullFluid(_from.peripheralName, count, slot.name)
-      if math.type(count) == "integer" then
-         count = count - moved
-         if count <= 0 then break end
+      local moved = 0
+      while moved < slot.amount do
+         local m = self.peripheral.pullFluid(_from.peripheralName, count, slot.name)
+         if m == 0 then break end
+         moved = moved + m
+         total = total + moved
+         if math.type(count) == "integer" then
+            count = count - moved
+            if count <= 0 then break end
+         end
       end
-      total = total + moved
    end
    return total
 end
@@ -349,5 +355,5 @@ function FluidStorage:pullFill(   from,
    end
 
 
-   return self:pullAll(peripheralName, fluid, count)
+   return self:pull(peripheralName, fluid, count)
 end

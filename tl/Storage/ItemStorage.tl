@@ -16,6 +16,7 @@ global record ItemStorage
 
   peripheralName: string
   peripheral: peripheral.inventory
+  cachedList: { integer : SlotContents }
   --find: function(self: ItemStorage, item: Item) : {boolean,integer,integer} --Found,Slot,Count  
   list: function(self: ItemStorage, filter: Item | string | nil) : {integer : SlotContents}
   count: function (self: ItemStorage, item: Item | string | integer | nil) : integer
@@ -25,6 +26,9 @@ global record ItemStorage
   size: function(self: ItemStorage) : integer
   getItem: function(self: ItemStorage, slot : integer) : SlotContents
   getItemDetail: function(self: ItemStorage, slot : integer) : SlotContents
+  cacheList: function(self: ItemStorage)
+  clearListCache: function(self: ItemStorage)
+  --search: function(self : ItemStorage, criteria : string)
 
   push: function (
     self: ItemStorage,
@@ -117,7 +121,7 @@ local record ItemStorageWrapper
 end
 
 function ItemStorage:list(filter: Item | string | nil) : {integer : ItemStorage.SlotContents}
-  local list = self.peripheral.list() as { integer : ItemStorage.SlotContents } 
+  local list = self.cachedList or self.peripheral.list() as { integer : ItemStorage.SlotContents } 
   if filter is nil then return list end
   local id : string
   if filter is string then id = filter
@@ -130,6 +134,14 @@ function ItemStorage:list(filter: Item | string | nil) : {integer : ItemStorage.
     end
   end
   return filtered
+end
+
+function ItemStorage:cacheList()
+  self.cachedList = self.peripheral.list() as {integer : ItemStorage.SlotContents}
+end
+
+function ItemStorage:clearCache()
+  self.cachedList = nil
 end
 
 function ItemStorage:size() : integer
