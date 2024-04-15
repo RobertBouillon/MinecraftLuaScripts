@@ -69,14 +69,14 @@ factory:make(2, Things.EmptyPCB)
 factory:make(16, Things.BasicCircuit)
 factory:make(52, Things.UpgradeMatrix)
 --factory:make(100, Things.IesniumDust) --Recipes need minimum quantities
-factory:make(16, Things.FormationCore)
-factory:make(16, Things.AnnihilationCore)
+factory:make(32, Things.FormationCore)
+factory:make(32, Things.AnnihilationCore)
 
 
 
-factory:make(8, Things.CalculationProcessor)
-factory:make(8, Things.EngineeringProcessor)
-factory:make(8, Things.LogicProcessor)
+factory:make(64, Things.CalculationProcessor)
+factory:make(64, Things.EngineeringProcessor)
+factory:make(64, Things.LogicProcessor)
 
 
 

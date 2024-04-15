@@ -103,7 +103,7 @@ function Machine:clear(storage : Storage)
   self.type.clearer(self,storage)
 end
 
-local function defaultWorker(machine:Machine, storage : Storage, itemsIn:{Thing}, itemsOut:{Thing})
+function Machine.defaultWorker(machine:Machine, storage : Storage, itemsIn:{Thing}, itemsOut:{Thing})
   --Local storage should always have the APIs
   local item = storage.item as ItemStorage
   local fluid = storage.fluid as FluidStorage
@@ -125,7 +125,7 @@ local function defaultWorker(machine:Machine, storage : Storage, itemsIn:{Thing}
   end
 end
 
-local function defaultClearer(machine:Machine, storage : Storage)
+function Machine.defaultClearer(machine:Machine, storage : Storage)
   --Local storage should always have the APIs
   local item = storage.item as ItemStorage
   local fluid = storage.fluid as FluidStorage

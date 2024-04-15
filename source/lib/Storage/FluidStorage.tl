@@ -255,7 +255,7 @@ function FluidStorage:pushFill(
     count = nil
   end
 
-  return self:push(to, fluid, count)
+  return self:pushAll(to, fluid, count)
 end
 
 
@@ -362,5 +362,5 @@ function FluidStorage:pullFill(
   end
 
 
-  return self:pull(peripheralName, fluid, count)
+  return self:pullAll(peripheralName, fluid, count)
 end

@@ -24,8 +24,8 @@ global record ItemStorage
   find: function(self: ItemStorage, item: Item | string) : boolean,integer | nil,integer | nil --Found,Slot,Count
   counts: function(self: ItemStorage) : { string : integer}
   size: function(self: ItemStorage) : integer
-  getItem: function(self: ItemStorage, slot : integer) : SlotContents
-  getItemDetail: function(self: ItemStorage, slot : integer) : SlotContents
+  getItem: function(self: ItemStorage, slot : integer) : SlotContents | nil
+  getItemDetail: function(self: ItemStorage, slot : integer) : SlotContents | nil
   cacheList: function(self: ItemStorage)
   clearListCache: function(self: ItemStorage)
   --search: function(self : ItemStorage, criteria : string)
@@ -148,11 +148,11 @@ function ItemStorage:size() : integer
   return self.peripheral.size()
 end
 
-function ItemStorage:getItem(slot: integer) : ItemStorage.SlotContents
+function ItemStorage:getItem(slot: integer) : ItemStorage.SlotContents | nil
   return self:list()[slot]
 end
 
-function ItemStorage:getItemDetail(slot: integer) : ItemStorage.SlotContents
+function ItemStorage:getItemDetail(slot: integer) : ItemStorage.SlotContents | nil
   return self.peripheral.getItemDetail(slot) as ItemStorage.SlotContents
 end
 
@@ -178,8 +178,8 @@ function ItemStorageWrapper:getItemStorage() : ItemStorage
   error("'".. self.peripheralName .."' does not support the inventory API")
 end
 
-function ItemStorage.isItemStorage(name: string) : boolean
-  local types = {peripheral.getType(name)}
+function ItemStorage.isItemStorage(peripheralName: string) : boolean
+  local types = {peripheral.getType(peripheralName)}
   for _,t in ipairs(types) do
     if t == "inventory" then return true end
   end
@@ -326,7 +326,7 @@ function ItemStorage:pushFill(
     count = nil
   end
 
-  return self:push(to, item, count, toSlot)
+  return self:pushAll(to, item, count, toSlot)
 end
 
 function ItemStorage:pushSlots(
@@ -437,8 +437,6 @@ function ItemStorage:pullFill(
   max: integer | nil
   ) : integer
 
-  local peripheralName = ItemStorage.getPeripheralName(from)
-
   local count : integer
   if toSlot is nil then
     count = self:count(item)
@@ -459,7 +457,7 @@ function ItemStorage:pullFill(
     count = nil
   end
   
-  return self:pull(peripheralName, item, count, toSlot)
+  return self:pullAll(from, item, count, toSlot)
 end
 
 function ItemStorage:pullSlots(

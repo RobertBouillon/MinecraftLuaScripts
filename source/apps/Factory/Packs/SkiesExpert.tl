@@ -107,6 +107,12 @@ local CompositeMachines = {
 }
 
 
+Machines.PhytogenicInsolator.worker = function(machine:Machine, storage : Storage, itemsIn : {Thing}, itemsOut: {Thing})
+  --Reason: for some reason the output from the previous build hangs out in the machine and needs to be removed for the next recipe
+  
+  machine.storage[1].item.pushSlots(storage, nil, 4)
+  Machine.defaultWorker(machine, storage, itemsIn, itemsOut)
+end
 
 --- Machine Customization
 local ifclearer  = function (machine:Machine, storage : Storage)
